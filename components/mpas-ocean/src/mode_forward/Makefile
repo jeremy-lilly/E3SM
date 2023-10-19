@@ -5,13 +5,18 @@ OBJS = mpas_ocn_forward_mode.o \
        mpas_ocn_time_integration_rk4.o \
        mpas_ocn_time_integration_si.o \
        mpas_ocn_time_integration_split.o \
-       mpas_ocn_time_integration_lts.o
+       mpas_ocn_time_integration_lts.o \
+       mpas_ocn_time_integration_fblts.o
 
 all: forward_mode
 
 forward_mode: $(OBJS) 
 
-mpas_ocn_time_integration.o: mpas_ocn_time_integration_rk4.o mpas_ocn_time_integration_si.o  mpas_ocn_time_integration_split.o mpas_ocn_time_integration_lts.o
+mpas_ocn_time_integration.o: mpas_ocn_time_integration_rk4.o \
+	                         mpas_ocn_time_integration_si.o \
+							 mpas_ocn_time_integration_split.o \
+							 mpas_ocn_time_integration_lts.o \
+							 mpas_ocn_time_integration_fblts.o
 
 mpas_ocn_time_integration_rk4.o: 
 
@@ -25,7 +30,8 @@ mpas_ocn_forward_mode.o: mpas_ocn_time_integration.o \
                          mpas_ocn_time_integration_rk4.o \
                          mpas_ocn_time_integration_si.o \
                          mpas_ocn_time_integration_split.o \
-                         mpas_ocn_time_integration_lts.o
+                         mpas_ocn_time_integration_lts.o \
+					     mpas_ocn_time_integration_fblts.o
 
 clean:
 	$(RM) *.o *.mod *.f90
