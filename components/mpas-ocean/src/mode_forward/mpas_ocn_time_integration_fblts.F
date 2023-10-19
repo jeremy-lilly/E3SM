@@ -128,7 +128,7 @@ module ocn_time_integration_fblts
 
 !|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 !
-!  ocn_lts_tends
+!  ocn_lts_thick_tend
 !
 !> \brief  MPAS ocean LTS3 Time integration scheme
 !> \author Giacomo Capodaglio
@@ -138,8 +138,8 @@ module ocn_time_integration_fblts
 !
 !-----------------------------------------------------------------------
 
-   subroutine ocn_lts_tends(statePool, LTSPool, tendPool, timeLevelIn, computeOnFineBig, &
-                            computeOnFineSmall, computeOnCoarse, computeOnInterface)!{{{
+   subroutine ocn_lts_thick_tend(statePool, LTSPool, tendPool, timeLevelIn, computeOnFineBig, &
+                                 computeOnFineSmall, computeOnCoarse, computeOnInterface)!{{{
       
       !-----------------------------------------------------------------
       ! Input variables
@@ -153,19 +153,61 @@ module ocn_time_integration_fblts
          computeOnInterface
 
       type (mpas_pool_type), intent(in) :: &
-         statePool          !< Input: state variables
+         statePool  !< Input: state variables
 
       type (mpas_pool_type), intent(in) :: &
-         LTSPool          !< Input: LTS data
+         LTSPool  !< Input: LTS data
 
       !-----------------------------------------------------------------
       ! Input/output variables
       !-----------------------------------------------------------------
       
       type (mpas_pool_type), intent(inout) :: &
-         tendPool          !< Input: tendency variables
+         tendPool  !< Input/output: tendency variables
      
-   end subroutine ocn_lts_tends!}}}
+   end subroutine ocn_lts_thick_tend!}}}
+
+
+!|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+!
+!  ocn_lts_vel_tend
+!
+!> \brief  MPAS ocean LTS3 Time integration scheme
+!> \author Giacomo Capodaglio
+!> \date   October 2023 
+!> \details
+!>  This routine calculates the tendencies on different LTS regions
+!
+!-----------------------------------------------------------------------
+
+   subroutine ocn_lts_vel_tend(statePool, LTSPool, tendPool, timeLevelIn, computeOnFineBig, &
+                               computeOnFineSmall, computeOnCoarse, computeOnInterface)!{{{
+      
+      !-----------------------------------------------------------------
+      ! Input variables
+      !-----------------------------------------------------------------
+      
+      integer, intent(in) :: &
+         timeLevelIn, &
+         computeOnFineBig, &
+         computeOnFineSmall, &
+         computeOnCoarse, &
+         computeOnInterface
+
+      type (mpas_pool_type), intent(in) :: &
+         statePool  !< Input: state variables
+
+      type (mpas_pool_type), intent(in) :: &
+         LTSPool  !< Input: LTS data
+
+      !-----------------------------------------------------------------
+      ! Input/output variables
+      !-----------------------------------------------------------------
+      
+      type (mpas_pool_type), intent(inout) :: &
+         tendPool  !< Input/output: tendency variables
+     
+   end subroutine ocn_lts_vel_tend!}}}
 
 
 end module ocn_time_integration_fblts
