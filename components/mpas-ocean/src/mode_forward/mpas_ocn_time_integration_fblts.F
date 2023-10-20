@@ -130,7 +130,7 @@ module ocn_time_integration_fblts
 !
 !  ocn_lts_thick_tend
 !
-!> \brief  MPAS ocean LTS3 Time integration scheme
+!> \brief  Calculate thickness tendencies for FB_LTS
 !> \author Giacomo Capodaglio
 !> \date   October 2023 
 !> \details
@@ -290,7 +290,7 @@ module ocn_time_integration_fblts
 !
 !  ocn_lts_vel_tend
 !
-!> \brief  MPAS ocean LTS3 Time integration scheme
+!> \brief  Calculate velocity tendencies for FB_LTS
 !> \author Giacomo Capodaglio
 !> \date   October 2023 
 !> \details
