@@ -7,7 +7,7 @@
 !
 !|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 !
-!  ocn_time_integration_lts
+!  ocn_time_integration_fblts
 !
 !> \brief  MPAS barotropic ocean LTS Time integration scheme
 !> \author Jeremy Lilly
@@ -164,7 +164,125 @@ module ocn_time_integration_fblts
       
       type (mpas_pool_type), intent(inout) :: &
          tendPool  !< Input/output: tendency variables
-     
+    
+      !-----------------------------------------------------------------
+      ! Local variables
+      !-----------------------------------------------------------------
+      
+      integer, dimension(:,:), pointer :: &
+         nCellsInLTSRegion
+      
+      integer, dimension(:,:,:), pointer :: &
+         cellsInLTSRegion
+      
+      real (kind=RKIND), dimension(:,:), pointer :: &
+         layerThicknessTend, &
+         normalVelocity, & 
+         layerThickness
+
+      integer :: &
+         iEdge, cell1, cell2, k, ie, iRegion, nRegions, &
+         ic, i, iCell, kmin, kmax
+      real (kind=RKIND) :: &
+         invdcEdge, flux 
+      
+      !-----------------------------------------------------------------
+      ! Begin routine
+      !-----------------------------------------------------------------
+      
+      nRegions = 2
+
+      call mpas_pool_get_array(LTSPool, 'cellsInLTSRegion', cellsInLTSRegion)
+      call mpas_pool_get_array(LTSPool, 'nCellsInLTSRegion', nCellsInLTSRegion)
+
+      call mpas_pool_get_array(tendPool, 'layerThickness', layerThicknessTend)
+
+      call mpas_pool_get_array(statePool, 'normalVelocity', normalVelocity, timeLevelIn)
+      call mpas_pool_get_array(statePool, 'layerThickness', layerThickness, timeLevelIn)
+
+      ! calculate layerThickEdgeFlux
+      do iEdge = 1, nEdgesAll
+         kmin = minLevelEdgeBot(iEdge)
+         kmax = maxLevelEdgeTop(iEdge)
+         cell1 = cellsOnEdge(1,iEdge)
+         cell2 = cellsOnEdge(2,iEdge)
+         do k = 1,nVertLevels
+            ! initialize layerThicknessEdgeMean to avoid divide by
+            ! zero and NaN problems.
+            layerThickEdgeFlux(k,iEdge) = -1.0e34_RKIND
+         end do
+         do k = kmin,kmax
+            ! central differenced
+            layerThickEdgeFlux(k,iEdge) = 0.5_RKIND * &
+                                          ( layerThickness(k,cell1) &
+                                          + layerThickness(k,cell2) )
+         end do
+      end do
+   
+      layerThicknessTend(:, :) = 0.0_RKIND
+
+      if (computeOnInterface == 1) then
+         do iRegion = 1, nRegions
+            ! thickness tendency
+            do ic = 1, nCellsInLTSRegion(iRegion,2)
+               iCell = cellsInLTSRegion(iRegion,2,ic)
+               do i = 1, nEdgesOnCell(iCell)
+                  iEdge = edgesOnCell(i, iCell)
+                  do k = minLevelEdgeBot(iEdge), maxLevelEdgeTop(iEdge)
+                     flux = normalVelocity(k, iEdge) * dvEdge(iEdge) * layerThickEdgeFlux(k, iEdge)
+                     layerThicknessTend(k, iCell) = layerThicknessTend(k, iCell) & 
+                                                    + edgeSignOnCell(i, iCell) * flux * invAreaCell(iCell)
+                  end do
+               end do
+            end do
+         end do
+      end if
+
+      if (computeOnFineBig == 1) then
+         ! thickness tendency
+         do ic = 1, nCellsInLTSRegion(1,1)
+            iCell = cellsInLTSRegion(1,1,ic)
+            do i = 1, nEdgesOnCell(iCell)
+               iEdge = edgesOnCell(i, iCell)
+               do k = minLevelEdgeBot(iEdge), maxLevelEdgeTop(iEdge)
+                  flux = normalVelocity(k, iEdge) * dvEdge(iEdge) * layerThickEdgeFlux(k, iEdge)
+                  layerThicknessTend(k, iCell) = layerThicknessTend(k,iCell) &
+                                                 + edgeSignOnCell(i, iCell) * flux * invAreaCell(iCell)
+               end do
+            end do
+         end do
+      end if
+
+      if (computeOnFineSmall == 1) then
+         ! thickness tendency
+         do ic = 1, nCellsInLTSRegion(1,3)
+            iCell = cellsInLTSRegion(1,3,ic)
+            do i = 1, nEdgesOnCell(iCell)
+               iEdge = edgesOnCell(i, iCell)
+               do k = minLevelEdgeBot(iEdge), maxLevelEdgeTop(iEdge)
+                  flux = normalVelocity(k, iEdge) * dvEdge(iEdge) * layerThickEdgeFlux(k, iEdge)
+                  layerThicknessTend(k, iCell) = layerThicknessTend(k,iCell) &
+                                                 + edgeSignOnCell(i, iCell) * flux * invAreaCell(iCell)
+               end do
+            end do
+         end do
+      end if
+
+      if (computeOnCoarse == 1) then
+         ! thickness tendency
+         do ic = 1, nCellsInLTSRegion(2,1)
+            iCell = cellsInLTSRegion(2,1,ic)
+            do i = 1, nEdgesOnCell(iCell)
+               iEdge = edgesOnCell(i, iCell)
+               do k = minLevelEdgeBot(iEdge), maxLevelEdgeTop(iEdge)
+                  flux = normalVelocity(k, iEdge) * dvEdge(iEdge) * layerThickEdgeFlux(k, iEdge)
+                  layerThicknessTend(k, iCell) = layerThicknessTend(k,iCell) &
+                                                 + edgeSignOnCell(i, iCell) * flux * invAreaCell(iCell)
+               end do
+            end do
+         end do
+      end if
+
    end subroutine ocn_lts_thick_tend!}}}
 
 
@@ -206,7 +324,145 @@ module ocn_time_integration_fblts
       
       type (mpas_pool_type), intent(inout) :: &
          tendPool  !< Input/output: tendency variables
-     
+    
+      !-----------------------------------------------------------------
+      ! Local variables
+      !-----------------------------------------------------------------
+      
+      integer, dimension(:,:), pointer :: &
+         nEdgesInLTSRegion
+      
+      integer, dimension(:,:,:), pointer :: &
+         edgesInLTSRegion
+      
+      real (kind=RKIND), dimension(:), pointer :: &
+         ssh
+      
+      real (kind=RKIND), dimension(:,:), pointer :: &
+         normalVelocityTend, &
+         normalVelocity, & 
+         layerThickness
+
+      integer :: &
+         iEdge, cell1, cell2, k, ie, iRegion, nRegions, &
+         ic, i, iCell, kmin, kmax
+      real (kind=RKIND) :: &
+         invdcEdge, betaSelfAttrLoad, flux, ssh_sal_on
+      
+      !-----------------------------------------------------------------
+      ! Begin routine
+      !-----------------------------------------------------------------
+      
+      betaSelfAttrLoad = config_self_attraction_and_loading_beta
+      nRegions = 2
+
+      call mpas_pool_get_array(LTSPool, 'edgesInLTSRegion', edgesInLTSRegion)
+      call mpas_pool_get_array(LTSPool, 'nEdgesInLTSRegion', nEdgesInLTSRegion)
+
+      call mpas_pool_get_array(tendPool, 'normalVelocity', normalVelocityTend)
+
+      call mpas_pool_get_array(statePool, 'normalVelocity', normalVelocity, timeLevelIn)
+      call mpas_pool_get_array(statePool, 'layerThickness', layerThickness, timeLevelIn)
+      call mpas_pool_get_array(statePool, 'ssh', ssh, timeLevelIn)
+
+      if (config_use_self_attraction_loading) then
+         ssh_sal_on = 1.0_RKIND
+      else
+         ssh_sal_on = 0.0_RKIND
+      endif
+      
+      ! ssh
+      do iCell = 1, nCellsAll
+         k = maxLevelCell(iCell)
+         zTop(k:nVertLevels,iCell) = -bottomDepth(iCell) + layerThickness(k,iCell)
+         do k = maxLevelCell(iCell)-1, minLevelCell(iCell), -1
+            zTop(k,iCell) = zTop(k+1,iCell) + layerThickness(k  ,iCell)
+         end do
+         ! copy zTop(1,iCell) into sea-surface height array
+         ssh(iCell) = zTop(minLevelCell(iCell),iCell)
+      end do
+
+      normalVelocityTend(:,:) = 0.0_RKIND
+
+      ! interface
+      if (computeOnInterface == 1) then
+         do iRegion = 1, nRegions
+            ! velocity tendency
+            do ie = 1, nEdgesInLTSRegion(iRegion,2)
+               iEdge = edgesInLTSRegion(iRegion,2,ie)
+               cell1 = cellsOnEdge(1,iEdge)
+               cell2 = cellsOnEdge(2,iEdge)
+               invdcEdge = 1.0_RKIND / dcEdge(iEdge)
+               kMin = minLevelEdgeBot(iEdge)
+               kMax = maxLevelEdgeTop(iEdge)
+               do k=kMin,kMax
+                  normalVelocityTend(k,iEdge) = normalVelocityTend(k,iEdge) &
+                                                - edgeMask(k,iEdge) * invdcEdge &
+                                                * ( gravity * ( (ssh(cell2) - ssh(cell1)) &
+                                                - (1.0_RKIND - ssh_sal_on) * betaSelfAttrLoad &
+                                                * (ssh(cell2) - ssh(cell1)) ) )
+               end do
+            end do
+         end do
+      end if
+
+      if (computeOnFineBig == 1) then
+         ! velocity tendency
+         do ie = 1, nEdgesInLTSRegion(1,1)
+            iEdge = edgesInLTSRegion(1,1,ie)
+            cell1 = cellsOnEdge(1,iEdge)
+            cell2 = cellsOnEdge(2,iEdge)
+            invdcEdge = 1.0_RKIND / dcEdge(iEdge)
+            kMin = minLevelEdgeBot(iEdge)
+            kMax = maxLevelEdgeTop(iEdge)
+            do k=kMin,kMax
+               normalVelocityTend(k,iEdge) = normalVelocityTend(k,iEdge) &
+                                             - edgeMask(k,iEdge) * invdcEdge &
+                                             * ( gravity * ( (ssh(cell2) - ssh(cell1)) &
+                                             - (1.0_RKIND - ssh_sal_on) * betaSelfAttrLoad &
+                                             * (ssh(cell2) - ssh(cell1)) ) )
+            end do
+         end do
+      end if
+
+      if (computeOnFineSmall == 1) then
+         ! velocity tendency
+         do ie = 1, nEdgesInLTSRegion(1,3)
+            iEdge = edgesInLTSRegion(1,3,ie)
+            cell1 = cellsOnEdge(1,iEdge)
+            cell2 = cellsOnEdge(2,iEdge)
+            invdcEdge = 1.0_RKIND / dcEdge(iEdge)
+            kMin = minLevelEdgeBot(iEdge)
+            kMax = maxLevelEdgeTop(iEdge)
+            do k=kMin,kMax
+               normalVelocityTend(k,iEdge) = normalVelocityTend(k,iEdge) &
+                                             - edgeMask(k,iEdge) * invdcEdge &
+                                             * ( gravity * ( (ssh(cell2) - ssh(cell1)) &
+                                             - (1.0_RKIND - ssh_sal_on) * betaSelfAttrLoad &
+                                             * (ssh(cell2) - ssh(cell1)) ) )
+            end do
+         end do
+      end if
+
+      if (computeOnCoarse == 1) then
+         ! velocity tendency
+         do ie = 1, nEdgesInLTSRegion(2,1)
+            iEdge = edgesInLTSRegion(2,1,ie)
+            cell1 = cellsOnEdge(1,iEdge)
+            cell2 = cellsOnEdge(2,iEdge)
+            invdcEdge = 1.0_RKIND / dcEdge(iEdge)
+            kMin = minLevelEdgeBot(iEdge)
+            kMax = maxLevelEdgeTop(iEdge)
+            do k=kMin,kMax
+               normalVelocityTend(k,iEdge) = normalVelocityTend(k,iEdge) &
+                                             - edgeMask(k,iEdge) * invdcEdge &
+                                             * ( gravity * ( (ssh(cell2) - ssh(cell1)) &
+                                             - (1.0_RKIND - ssh_sal_on) * betaSelfAttrLoad &
+                                             * (ssh(cell2) - ssh(cell1)) ) )
+            end do
+         end do
+      end if
+
    end subroutine ocn_lts_vel_tend!}}}
 
 
