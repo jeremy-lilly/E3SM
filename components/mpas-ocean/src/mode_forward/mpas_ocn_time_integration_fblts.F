@@ -70,11 +70,12 @@ module ocn_time_integration_fblts
 !-----------------------------------------------------------------------
 
    subroutine ocn_time_integrator_fblts(domain, dt)!{{{
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   ! Advance model state forward in time by the specified time step using
-   ! a local time stepping scheme with spltting of the fast and slow tendencies
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! Advance model state forward in time by the specified time step 
+   ! using a local time stepping scheme with spltting of the fast and 
+   ! slow tendencies
    !
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
       implicit none
 
@@ -91,6 +92,285 @@ module ocn_time_integration_fblts
 
       type (domain_type), intent(inout) :: &
          domain  !< [inout] model state to advance forward
+
+      !-----------------------------------------------------------------
+      ! Local variables
+      !-----------------------------------------------------------------
+
+      integer :: &
+         iCell, iEdge, iRegion, k, ic, ie, im, &  ! iterators
+         M, &  ! M = dtCoarse / dtFine
+         nRegions  ! number of interface regions (two)
+
+      type (block_type), pointer :: &
+         block  ! structure with subdomain data
+
+      type (mpas_pool_type), pointer :: &
+         tendPool, &  ! structure holding tendencies
+         statePool, &  ! structure holding state variables
+         meshPool, &  ! structure holding mesh variables
+         verticalMeshPool, &  ! structure holding mesh variables
+         forcingPool, &  ! structure holding forcing variables
+         scratchPool, &  ! structure holding temporary variables
+         tracersPool  ! structure holding tracers variables
+
+      ! LTS Pools
+      type (mpas_pool_type), pointer :: &
+         LTSPool, &  ! structure holding LTS variables
+         tendSlowPool, &  ! structure holding the slow tendency variables
+         tendSum1stPool, &  ! structure holding one of the correction terms for the interface
+         tendSum2ndPool, &  ! structure holding one of the correction terms for the interface
+         tendSum3rdPool, &  ! structure holding one of the correction terms for the interface
+         prevTendSlowPool, nextTendSlowPool, &  ! structures containing intermediate data
+         prevTendSum1stPool, nextTendSum1stPool, &  ! structures containing intermediate data
+         prevTendSum2ndPool, nextTendSum2ndPool, &  ! structures containing intermediate data
+         prevTendSum3rdPool, nextTendSum3rdPool  ! structures containing intermediate data
+
+      ! Tend Array Pointers
+      real (kind=RKIND), dimension(:,:), pointer ::  &
+         normalVelocityTend, &  ! normal velocity fast tendency
+         layerThicknessTend, &  ! layer thickness tendency
+         normalVelocityTendSlow, &  ! normal velocity slow tendency
+         normalVelocityTendSum1st, &  ! one of the normal velocity correction terms for the interface
+         layerThicknessTendSum1st, &  ! one of the layer thickness correction terms for the interface
+         normalVelocityTendSum2nd, &  ! one of the normal velocity correction terms for the interface
+         layerThicknessTendSum2nd, &  ! one of the layer thickness correction terms for the interface
+         normalVelocityTendSum3rd, &  ! one of the normal velocity correction terms for the interface
+         layerThicknessTendSum3rd   ! one of the layer thickness correction terms for the interface
+
+      ! State Array Pointers
+      real (kind=RKIND), dimension(:,:), pointer :: &
+         normalVelocityCur, &  ! normal velocity at time n
+         normalVelocityNew, &  ! normal velocity at time n+1
+         normalVelocityFirstStage, &  ! normal velocity at first stage of LTS
+         normalVelocitySecondStage, &  ! normal velocity at second stage of LTS
+         layerThicknessCur, &  ! layer thickness at time n
+         layerThicknessNew, &  ! layer thickness at time n+1
+         layerThicknessFirstStage, &  ! layer thickness at first stage of LTS
+         layerThicknessSecondStage  ! layer thickness at second stage of LTS
+
+      ! LTS objects
+      real (kind=RKIND) :: &
+         dtFine, &  ! fine dt, defined as dt / M
+         alpha, alphaHat, beta, betaHat, gam, gamHat  ! interpolation coefficients for the predictor step of LTS
+      integer, dimension(:,:), pointer :: &
+         nCellsInLTSRegion, &  ! number of cells in a given LTS region
+         nEdgesInLTSRegion  ! number of edges in a given LTS region
+      integer, dimension(:,:,:), pointer :: &
+         cellsInLTSRegion, &  ! list of cells in a given LTS region
+         edgesInLTSRegion  ! list of edges in a given LTS region
+      real (kind=RKIND) :: &
+         weight1st, weight2nd, weight3rd  ! coefficents each RK stage
+      real (kind=RKIND) :: &
+         weightTendSum1st, weightTendSum2nd, weightTendSum3rd  ! coefficients for the interface correction
+
+      integer err 
+      err = 0
+      
+      !-----------------------------------------------------------------
+      ! Begin routine
+      !-----------------------------------------------------------------
+      
+      if (.not. config_disable_tr_all_tend) then
+         call mpas_log_write("ERROR: tracers are not currently implemented for local time-stepping")
+         call mpas_log_write("config_disable_tr_all_tend should be true in the namelist file")
+         call abort
+      end if
+      
+      
+      call mpas_timer_start("FB_LTS time-step prep")
+      
+      ! LTS parameters 
+      M = config_dt_scaling_LTS
+      nRegions = 2
+      dtFine = dt / M
+      
+      ! Weights for RK stages
+      weight1st = 1.0_RKIND / 3.0_RKIND
+      weight2nd = 1.0_RKIND / 2.0_RKIND
+      weight3rd = 1.0_RKIND
+      
+      block => domain % blocklist
+
+      ! Retrieve model state, pools
+      call mpas_pool_get_subpool(block%structs, 'mesh', meshPool)
+      call mpas_pool_get_subpool(block%structs, 'verticalMesh', verticalMeshPool)
+      call mpas_pool_get_subpool(block%structs, 'state', statePool)
+      call mpas_pool_get_subpool(block%structs, 'forcing', forcingPool)
+      call mpas_pool_get_subpool(block%structs, 'LTS', LTSPool)
+      call mpas_pool_get_subpool(block%structs, 'tend', tendPool)
+      call mpas_pool_get_subpool(block%structs, 'scratch', scratchPool)
+      call mpas_pool_get_subpool(statePool, 'tracers', tracersPool)
+      
+      ! Retrieve state variables at necessary time levels
+      call mpas_pool_get_array(statePool, 'normalVelocity', &
+                                           normalVelocityCur, 1)
+      call mpas_pool_get_array(statePool, 'normalVelocity', &
+                                           normalVelocityNew, 2)
+      call mpas_pool_get_array(statePool, 'normalVelocity', &
+                                           normalVelocityFirstStage, 3)
+      call mpas_pool_get_array(statePool, 'normalVelocity', &
+                                           normalVelocitySecondStage, 4)
+      call mpas_pool_get_array(statePool, 'layerThickness', &
+                                           layerThicknessCur, 1)
+      call mpas_pool_get_array(statePool, 'layerThickness', &
+                                           layerThicknessNew, 2)
+      call mpas_pool_get_array(statePool, 'layerThickness', &
+                                           layerThicknessFirstStage, 3)
+      call mpas_pool_get_array(statePool, 'layerThickness', &
+                                           layerThicknessSecondStage, 4)
+      
+      ! Retrieve tendency variables
+      call mpas_pool_get_array(tendPool, 'normalVelocity', normalVelocityTend)
+      call mpas_pool_get_array(tendPool, 'layerThickness', layerThicknessTend)
+
+      ! Retrieve LTS arrays
+      call mpas_pool_get_array(LTSPool, 'cellsInLTSRegion', cellsInLTSRegion)
+      call mpas_pool_get_array(LTSPool, 'nCellsInLTSRegion', nCellsInLTSRegion)
+      call mpas_pool_get_array(LTSPool, 'edgesInLTSRegion', edgesInLTSRegion)
+      call mpas_pool_get_array(LTSPool, 'nEdgesInLTSRegion', nEdgesInLTSRegion)
+      
+      ! Create and retrieve additional pools for LTS
+      !call mpas_pool_create_pool(tendSum1stPool)
+      !call mpas_pool_clone_pool(tendPool, tendSum1stPool, 1)
+      !call mpas_pool_create_pool(tendSum2ndPool)
+      !call mpas_pool_clone_pool(tendPool, tendSum2ndPool, 1)
+      call mpas_pool_create_pool(tendSum3rdPool)
+      call mpas_pool_clone_pool(tendPool, tendSum3rdPool, 1)
+      call mpas_pool_create_pool(tendSlowPool)
+      call mpas_pool_clone_pool(tendPool, tendSlowPool, 1)
+
+      !call mpas_pool_add_subpool(block % structs, 'tend_sum_1st', tendSum1stPool)
+      !call mpas_pool_add_subpool(block % structs, 'tend_sum_2nd', tendSum2ndPool)
+      call mpas_pool_add_subpool(block % structs, 'tend_sum_3rd', tendSum3rdPool)
+      call mpas_pool_add_subpool(block % structs, 'tend_slow', tendSlowPool)
+
+      call mpas_pool_get_array(tendSlowPool, 'normalVelocity', &
+                                              normalVelocityTendSlow)
+      !call mpas_pool_get_array(tendSum1stPool, 'normalVelocity', &
+      !                                          normalVelocityTendSum1st)
+      !call mpas_pool_get_array(tendSum1stPool, 'layerThickness', &
+      !                                          layerThicknessTendSum1st)
+      !call mpas_pool_get_array(tendSum2ndPool, 'normalVelocity', &
+      !                                          normalVelocityTendSum2nd)
+      !call mpas_pool_get_array(tendSum2ndPool, 'layerThickness', &
+      !                                          layerThicknessTendSum2nd)
+      call mpas_pool_get_array(tendSum3rdPool, 'normalVelocity', &
+                                                normalVelocityTendSum3rd)
+      call mpas_pool_get_array(tendSum3rdPool, 'layerThickness', &
+                                                layerThicknessTendSum3rd)
+      
+      ! Init variables
+      do iEdge = 1, nEdgesAll  ! do we need this?
+         do k = 1, maxLevelEdgeTop(iEdge)
+            normalVelocityNew(k, iEdge) = normalVelocityCur(k, iEdge)
+            normalVelocityFirstStage(k, iEdge) = normalVelocityCur(k, iEdge)
+            normalVelocitySecondStage(k, iEdge) = normalVelocityCur(k, iEdge)
+         end do
+      end do
+
+      do iCell = 1, nCellsAll  ! do we need this?
+         do k = 1, maxLevelCell(iCell)
+            layerThicknessNew(k, iCell) = layerThicknessCur(k, iCell)
+            layerThicknessFirstStage(k, iCell) = layerThicknessCur(k, iCell)
+            layerThicknessSecondStage(k, iCell) = layerThicknessCur(k, iCell)
+         end do
+      end do
+
+      !normalVelocityTendSum1st(:,:) = 0.0_RKIND
+      !layerThicknessTendSum1st(:,:) = 0.0_RKIND
+
+      !normalVelocityTendSum2nd(:,:) = 0.0_RKIND
+      !layerThicknessTendSum2nd(:,:) = 0.0_RKIND
+
+      normalVelocityTendSum3rd(:,:) = 0.0_RKIND
+      layerThicknessTendSum3rd(:,:) = 0.0_RKIND
+      
+      if (associated(block % prev)) then
+         !call mpas_pool_get_subpool(block % prev % structs, 'tend_sum_1st', tendSum1stPool)
+         !call mpas_pool_get_subpool(block % prev % structs, 'tend_sum_2nd', tendSum2ndPool)
+         call mpas_pool_get_subpool(block % prev % structs, 'tend_sum_3rd', tendSum3rdPool)
+         call mpas_pool_get_subpool(block % prev % structs, 'tend_slow', tendSlowPool)
+      else
+         !nullify(prevTendSum1stPool)
+         !nullify(prevTendSum2ndPool)
+         nullify(prevTendSum3rdPool)
+         nullify(prevTendSlowPool)
+      end if
+
+      if (associated(block % next)) then
+         !call mpas_pool_get_subpool(block % next % structs, 'tend_sum_1st', nextTendSum1stPool)
+         !call mpas_pool_get_subpool(block % next % structs, 'tend_sum_2nd', nextTendSum2ndPool)
+         call mpas_pool_get_subpool(block % next % structs, 'tend_sum_3rd', nextTendSum3rdPool)
+         call mpas_pool_get_subpool(block % next % structs, 'tend_slow', nextTendSlowPool)
+      else
+         !nullify(nextTendSum1stPool)
+         !nullify(nextTendSum2ndPool)
+         nullify(nextTendSum3rdPool)
+         nullify(nextTendSlowPool)
+      end if
+
+      !call mpas_pool_get_subpool(block % structs, 'tend_sum_1st', tendSum1stPool)
+      !call mpas_pool_get_subpool(block % structs, 'tend_sum_2nd', tendSum2ndPool)
+      call mpas_pool_get_subpool(block % structs, 'tend_sum_3rd', tendSum3rdPool)
+      call mpas_pool_get_subpool(block % structs, 'tend_slow', tendSlowPool)
+   
+      !if (associated(prevTendSum1stPool) .and. associated(nextTendSum1stPool)) then
+      !   call mpas_pool_link_pools(tendSum1stPool, prevTendSum1stPool, nextTendSum1stPool)
+      !else if (associated(prevTendSum1stPool)) then
+      !   call mpas_pool_link_pools(tendSum1stPool, prevTendSum1stPool)
+      !else if (associated(nextTendSum1stPool)) then
+      !   call mpas_pool_link_pools(tendSum1stPool,nextPool=nextTendSum1stPool)
+      !else
+      !   call mpas_pool_link_pools(tendSum1stPool)
+      !end if
+
+      !if (associated(prevTendSum2ndPool) .and. associated(nextTendSum2ndPool)) then
+      !   call mpas_pool_link_pools(tendSum2ndPool, prevTendSum2ndPool, nextTendSum2ndPool)
+      !else if (associated(prevTendSum2ndPool)) then
+      !   call mpas_pool_link_pools(tendSum2ndPool, prevTendSum2ndPool)
+      !else if (associated(nextTendSum2ndPool)) then
+      !   call mpas_pool_link_pools(tendSum2ndPool,nextPool=nextTendSum2ndPool)
+      !else
+      !   call mpas_pool_link_pools(tendSum2ndPool)
+      !end if
+
+      if (associated(prevTendSum3rdPool) .and. associated(nextTendSum3rdPool)) then
+         call mpas_pool_link_pools(tendSum3rdPool, prevTendSum3rdPool, nextTendSum3rdPool)
+      else if (associated(prevTendSum3rdPool)) then
+         call mpas_pool_link_pools(tendSum3rdPool, prevTendSum3rdPool)
+      else if (associated(nextTendSum3rdPool)) then
+         call mpas_pool_link_pools(tendSum3rdPool,nextPool=nextTendSum3rdPool)
+      else
+         call mpas_pool_link_pools(tendSum3rdPool)
+      end if
+
+      if (associated(prevTendSlowPool) .and. associated(nextTendSlowPool)) then
+         call mpas_pool_link_pools(tendSlowPool, prevTendSlowPool, nextTendSlowPool)
+      else if (associated(prevTendSlowPool)) then
+         call mpas_pool_link_pools(tendSlowPool, prevTendSlowPool)
+      else if (associated(nextTendSlowPool)) then
+         call mpas_pool_link_pools(tendSlowPool,nextPool=nextTendSlowPool)
+      else
+         call mpas_pool_link_pools(tendSlowPool)
+      end if
+
+      call mpas_pool_link_parinfo(block, tendSum1stPool)
+      call mpas_pool_link_parinfo(block, tendSum2ndPool)
+      call mpas_pool_link_parinfo(block, tendSum3rdPool)
+      call mpas_pool_link_parinfo(block, tendSlowPool)
+
+      call mpas_timer_stop("FB_LTS time-step prep")
+      
+
+      call mpas_timer_start("FB_LTS main loop")
+    
+      call mpas_timer_stop("FB_LTS main loop")
+      
+
+      call mpas_timer_start("FB_LTS cleanup phase")
+      
+      call mpas_timer_stop("FB_LTS cleanup phase")
 
    end subroutine ocn_time_integrator_fblts!}}}
 
