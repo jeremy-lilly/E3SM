@@ -355,17 +355,174 @@ module ocn_time_integration_fblts
          call mpas_pool_link_pools(tendSlowPool)
       end if
 
-      call mpas_pool_link_parinfo(block, tendSum1stPool)
-      call mpas_pool_link_parinfo(block, tendSum2ndPool)
+      !call mpas_pool_link_parinfo(block, tendSum1stPool)
+      !call mpas_pool_link_parinfo(block, tendSum2ndPool)
       call mpas_pool_link_parinfo(block, tendSum3rdPool)
       call mpas_pool_link_parinfo(block, tendSlowPool)
 
       call mpas_timer_stop("FB_LTS time-step prep")
       
 
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      !
+      ! BEGIN FB_LTS SCHEME
+      !
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      
       call mpas_timer_start("FB_LTS main loop")
+
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      ! BEGIN: Slow tendency calculation
+      ! Calculate the slow tendencies on all LTS regions (only the 
+      ! momentum equation contains slow terms)
+      call mpas_timer_start("FB_LTS slow tend computation")
+      
+      call ocn_tend_vel(domain, tendSlowPool, statePool, forcingPool, 1, &
+                        domain % dminfo, dt)
+
+      call mpas_timer_stop("FB_LTS slow tend computation")
+      ! END: Slow tendency calculation
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      
+
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      ! BEGIN COARSE ADVANCEMENT
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      ! BEGIN: Thickness stage 1
+      ! Compute the first stage of the thickness on fine*, interface 1, 
+      ! interface 2, and coarse
+      
+      ! END: Thickness stage 1
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      
+
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      ! BEGIN: Normal velocity stage 1
+      ! Compute the first stage of the normal velocity on fine*, 
+      ! interface 1, interface 2, and coarse
+      
+      ! END: Normal velocity stage 1
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      
+
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      ! BEGIN: Thickness stage 2
+      ! Compute the second stage of the thickness on fine*, interface 1, 
+      ! interface 2, and coarse
+      
+      ! END: Thickness stage 2
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      
+
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      ! BEGIN: Normal velocity stage 2
+      ! Compute the second stage of the normal velocity on fine*, 
+      ! interface 1, interface 2, and coarse
+      
+      ! END: Normal velocity stage 2
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      
+
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      ! BEGIN: Thickness stage 3
+      ! Compute the third stage of the thickness on fine*, interface 1, 
+      ! interface 2, and coarse
+      
+      ! END: Thickness stage 3
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      
+
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      ! BEGIN: Normal velocity stage 3
+      ! Compute the third stage of the normal velocity on, interface 1, 
+      ! and coarse
+      
+      ! END: Normal velocity stage 3
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      ! END COARSE ADVANCEMENT
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    
+
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      ! BEGIN FINE ADVANCEMENT
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      do im = 1,M
+
+         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+         ! BEGIN: Thickness stage 1
+         ! Compute the first stage of the thickness on fine
+      
+         ! END: Thickness stage 1
+         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+         
+
+         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+         ! BEGIN: Normal velocity stage 1
+         ! Compute the first stage of the normal velocity on fine
+      
+         ! END: Normal velocity stage 1
+         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+         ! BEGIN: Thickness stage 2
+         ! Compute the second stage of the thickness on fine
+      
+         ! END: Thickness stage 2
+         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+         
+
+         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+         ! BEGIN: Normal velocity stage 2
+         ! Compute the second stage of the normal velocity on fine
+      
+         ! END: Normal velocity stage 2
+         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+         
+
+         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+         ! BEGIN: Thickness stage 3
+         ! Compute the third stage of the thickness on fine and 
+         ! increment the third stage interface correction terms
+      
+         ! END: Thickness stage 3
+         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+         
+
+         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+         ! BEGIN: Normal velocity stage 3
+         ! Compute the third stage of the normal velocity on fine and 
+         ! increment the thrid stage interface correction terms
+      
+         ! END: Normal velocity stage 3
+         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+      end do
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      ! END FINE ADVANCEMENT
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      
+
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      ! BEGIN INTERFACE CORRECTION
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      ! END INTERFACE CORRECTION
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
       call mpas_timer_stop("FB_LTS main loop")
+      
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      !
+      ! END FB_LTS SCHEME
+      !
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       
 
       call mpas_timer_start("FB_LTS cleanup phase")
