@@ -131,8 +131,7 @@ module ocn_time_integration_fblts
          block
       
       type (mpas_pool_type), pointer :: &
-         LTSPool, &
-         meshPool
+         LTSPool
       
       integer, dimension(:), allocatable :: &
          isLTSRegionEdgeAssigned
@@ -164,7 +163,6 @@ module ocn_time_integration_fblts
 
       block => domain % blocklist
       call mpas_pool_get_subpool(block % structs, 'LTS', LTSPool)
-      call mpas_pool_get_subpool(block % structs, ',mesh', meshPool)
 
       call mpas_pool_get_array(LTSPool, 'LTSRegion', LTSRegion)
       call mpas_pool_get_array(LTSPool, 'cellsInLTSRegion', cellsInLTSRegion)
