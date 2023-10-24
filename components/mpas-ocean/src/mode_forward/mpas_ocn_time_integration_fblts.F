@@ -448,10 +448,19 @@ module ocn_time_integration_fblts
       call mpas_timer_stop("FB_LTS advance thickness solution")
       call mpas_timer_stop("FB_LTS advance solution")
 
+      ! Halo update
+      call mpas_timer_start("FB_LTS prognostic halo update")
+      call mpas_timer_start("FB_LTS thickness halo update")
+      
+      call mpas_dmpar_field_halo_exch(domain, 'layerThickness', timeLevel=3)
+      
+      call mpas_timer_stop("FB_LTS thickness halo update")
+      call mpas_timer_stop("FB_LTS prognostic halo update")
+
       ! END: Thickness stage 1
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      
 
+ 
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! BEGIN: Normal velocity stage 1
       ! Compute the first stage of the normal velocity on fine*, 
@@ -498,17 +507,18 @@ module ocn_time_integration_fblts
       call mpas_timer_start("FB_LTS advance velocity solution")
       call mpas_timer_start("FB_LTS advance solution")
 
+      ! Halo update
+      call mpas_timer_start("FB_LTS prognostic halo update")
+      call mpas_timer_start("FB_LTS velocity halo update")
+      
+      call mpas_dmpar_field_halo_exch(domain, 'normalVelocity', timeLevel=3)
+      
+      call mpas_timer_stop("FB_LTS velocity halo update")
+      call mpas_timer_stop("FB_LTS prognostic halo update")
+
       ! END: Normal velocity stage 1
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       
-      ! Halo update
-      call mpas_timer_start("FB_LTS prognostic halo update")
-      
-      call mpas_dmpar_field_halo_exch(domain, 'normalVelocity', timeLevel=3)
-      call mpas_dmpar_field_halo_exch(domain, 'layerThickness', timeLevel=3)
-      
-      call mpas_timer_stop("FB_LTS prognostic halo update")
-
 
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! BEGIN: Thickness stage 2
