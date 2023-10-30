@@ -399,7 +399,9 @@ module ocn_time_integration_fblts
       call mpas_timer_start("FB_LTS compute fast tendencies")
       call mpas_timer_start("FB_LTS compute fast thickness tendencies")
 
-      call ocn_lts_thick_tend(statePool, LTSPool, tendPool, 1, 0, 1, 1, 1)
+      call ocn_lts_thick_tend(LTSPool, tendPool, &
+                              normalVelocityCur, layerThicknessCur, &
+                              0, 1, 1, 1, 1)
 
       call mpas_timer_stop("FB_LTS compute fast thickness tendencies")
       call mpas_timer_stop("FB_LTS compute fast tendencies")
@@ -518,7 +520,9 @@ module ocn_time_integration_fblts
       call mpas_timer_start("FB_LTS compute fast tendencies")
       call mpas_timer_start("FB_LTS compute fast thickness tendencies")
 
-      call ocn_lts_thick_tend(statePool, LTSPool, tendPool, 3, 0, 1, 1, 1)
+      call ocn_lts_thick_tend(LTSPool, tendPool, &
+                              normalVelocityFirstStage, layerThicknessFirstStage, &
+                              0, 1, 1, 1, 1)
 
       call mpas_timer_stop("FB_LTS compute fast thickness tendencies")
       call mpas_timer_stop("FB_LTS compute fast tendencies")
@@ -637,7 +641,9 @@ module ocn_time_integration_fblts
       call mpas_timer_start("FB_LTS compute fast tendencies")
       call mpas_timer_start("FB_LTS compute fast thickness tendencies")
 
-      call ocn_lts_thick_tend(statePool, LTSPool, tendPool, 4, 0, 1, 1, 1)
+      call ocn_lts_thick_tend(LTSPool, tendPool, & 
+                              normalVelocitySecondStage, layerThicknessSecondStage, &
+                              0, 1, 1, 1, 1)
 
       call mpas_timer_stop("FB_LTS compute fast thickness tendencies")
       call mpas_timer_stop("FB_LTS compute fast tendencies")
@@ -1019,29 +1025,33 @@ module ocn_time_integration_fblts
 !  ocn_lts_thick_tend
 !
 !> \brief  Calculate thickness tendencies for FB_LTS
-!> \author Giacomo Capodaglio
+!> \author Jeremy Lilly
 !> \date   October 2023 
 !> \details
 !>  This routine calculates the tendencies on different LTS regions
 !
 !-----------------------------------------------------------------------
 
-   subroutine ocn_lts_thick_tend(statePool, LTSPool, tendPool, timeLevelIn, computeOnFineBig, &
-                                 computeOnFineSmall, computeOnCoarse, computeOnInterface)!{{{
+   subroutine ocn_lts_thick_tend(LTSPool, tendPool, &
+                                 normalVelocity, layerThickness, &
+                                 computeOnFineInterior, computeOnFineInterfaceAdjacent, &
+                                 computeOnInterfaceOne, computeOnInterfaceTwo, &
+                                 computeOnCoarse)!{{{
       
       !-----------------------------------------------------------------
       ! Input variables
       !-----------------------------------------------------------------
       
       integer, intent(in) :: &
-         timeLevelIn, &
-         computeOnFineBig, &
-         computeOnFineSmall, &
-         computeOnCoarse, &
-         computeOnInterface
+         computeOnFineInterior, &
+         computeOnFineInterfaceAdjacent, &
+         computeOnInterfaceOne, &
+         computeOnInterfaceTwo, &
+         computeOnCoarse
 
-      type (mpas_pool_type), intent(in) :: &
-         statePool  !< Input: state variables
+      real (kind=RKIND), dimension(:,:), pointer :: &
+         layerThickness, &
+         normalVelocity
 
       type (mpas_pool_type), intent(in) :: &
          LTSPool  !< Input: LTS data
@@ -1064,12 +1074,10 @@ module ocn_time_integration_fblts
          cellsInLTSRegion
       
       real (kind=RKIND), dimension(:,:), pointer :: &
-         layerThicknessTend, &
-         normalVelocity, & 
-         layerThickness
+         layerThicknessTend
 
       integer :: &
-         iEdge, cell1, cell2, k, ie, iRegion, nRegions, &
+         iEdge, cell1, cell2, k, ie, &
          ic, i, iCell, kmin, kmax
       real (kind=RKIND) :: &
          invdcEdge, flux 
@@ -1078,15 +1086,10 @@ module ocn_time_integration_fblts
       ! Begin routine
       !-----------------------------------------------------------------
       
-      nRegions = 2
-
       call mpas_pool_get_array(LTSPool, 'cellsInLTSRegion', cellsInLTSRegion)
       call mpas_pool_get_array(LTSPool, 'nCellsInLTSRegion', nCellsInLTSRegion)
 
       call mpas_pool_get_array(tendPool, 'layerThickness', layerThicknessTend)
-
-      call mpas_pool_get_array(statePool, 'normalVelocity', normalVelocity, timeLevelIn)
-      call mpas_pool_get_array(statePool, 'layerThickness', layerThickness, timeLevelIn)
 
       ! calculate layerThickEdgeFlux
       ! add upwind formulation, ask Giacomo about branch
@@ -1110,25 +1113,8 @@ module ocn_time_integration_fblts
    
       layerThicknessTend(:, :) = 0.0_RKIND
 
-      if (computeOnInterface == 1) then
-         do iRegion = 1, nRegions
-            ! thickness tendency
-            do ic = 1, nCellsInLTSRegion(iRegion,2)
-               iCell = cellsInLTSRegion(iRegion,2,ic)
-               do i = 1, nEdgesOnCell(iCell)
-                  iEdge = edgesOnCell(i, iCell)
-                  do k = minLevelEdgeBot(iEdge), maxLevelEdgeTop(iEdge)
-                     flux = normalVelocity(k, iEdge) * dvEdge(iEdge) * layerThickEdgeFlux(k, iEdge)
-                     layerThicknessTend(k, iCell) = layerThicknessTend(k, iCell) & 
-                                                    + edgeSignOnCell(i, iCell) * flux * invAreaCell(iCell)
-                  end do
-               end do
-            end do
-         end do
-      end if
-
-      if (computeOnFineBig == 1) then
-         ! thickness tendency
+      ! Fine in the interior, away from interface 1
+      if (computeOnFineInterior == 1) then
          do ic = 1, nCellsInLTSRegion(1,1)
             iCell = cellsInLTSRegion(1,1,ic)
             do i = 1, nEdgesOnCell(iCell)
@@ -1142,8 +1128,8 @@ module ocn_time_integration_fblts
          end do
       end if
 
-      if (computeOnFineSmall == 1) then
-         ! thickness tendency
+      ! Fine adjacent to interface 1
+      if (computeOnFineInterfaceAdjacent == 1) then
          do ic = 1, nCellsInLTSRegion(1,3)
             iCell = cellsInLTSRegion(1,3,ic)
             do i = 1, nEdgesOnCell(iCell)
@@ -1157,8 +1143,38 @@ module ocn_time_integration_fblts
          end do
       end if
 
+      ! Interface 1
+      if (computeOnInterfaceOne == 1) then
+         do ic = 1, nCellsInLTSRegion(1,2)
+            iCell = cellsInLTSRegion(1,2,ic)
+            do i = 1, nEdgesOnCell(iCell)
+               iEdge = edgesOnCell(i, iCell)
+               do k = minLevelEdgeBot(iEdge), maxLevelEdgeTop(iEdge)
+                  flux = normalVelocity(k, iEdge) * dvEdge(iEdge) * layerThickEdgeFlux(k, iEdge)
+                  layerThicknessTend(k, iCell) = layerThicknessTend(k, iCell) & 
+                                                 + edgeSignOnCell(i, iCell) * flux * invAreaCell(iCell)
+               end do
+            end do
+         end do
+      end if
+
+      ! Interface 2
+      if (computeOnInterfaceTwo == 1) then
+         do ic = 1, nCellsInLTSRegion(2,2)
+            iCell = cellsInLTSRegion(2,2,ic)
+            do i = 1, nEdgesOnCell(iCell)
+               iEdge = edgesOnCell(i, iCell)
+               do k = minLevelEdgeBot(iEdge), maxLevelEdgeTop(iEdge)
+                  flux = normalVelocity(k, iEdge) * dvEdge(iEdge) * layerThickEdgeFlux(k, iEdge)
+                  layerThicknessTend(k, iCell) = layerThicknessTend(k, iCell) & 
+                                                 + edgeSignOnCell(i, iCell) * flux * invAreaCell(iCell)
+               end do
+            end do
+         end do
+      end if
+
+      ! Coarse
       if (computeOnCoarse == 1) then
-         ! thickness tendency
          do ic = 1, nCellsInLTSRegion(2,1)
             iCell = cellsInLTSRegion(2,1,ic)
             do i = 1, nEdgesOnCell(iCell)
