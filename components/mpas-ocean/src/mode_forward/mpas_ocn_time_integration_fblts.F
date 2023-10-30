@@ -148,6 +148,11 @@ module ocn_time_integration_fblts
          layerThicknessNew, &  ! layer thickness at time n+1
          layerThicknessFirstStage, &  ! layer thickness at first stage of LTS
          layerThicknessSecondStage  ! layer thickness at second stage of LTS
+      
+      ! Extra pointers to store FB averages and interpolations of data stored in the state pool 
+      real (kind=RKIND), dimension(:,:), pointer :: &
+         normalVelocityForTend, &
+         layerThicknessForTend
 
       ! LTS objects
       real (kind=RKIND) :: &
@@ -458,11 +463,19 @@ module ocn_time_integration_fblts
       ! Compute the first stage of the normal velocity on fine*, 
       ! interface 1, interface 2, and coarse
       
+      ! Perform forward-backward average of thickness for stage one of 
+      ! FB-RK(3,2):
+      ! h = weight1*stage1 + (1-weight1)*current
+      layerThicknessForTend(:,:) = config_fb_weight_1 * layerThicknessFirstStage(:,:) &
+                                    + (1 - config_fb_weight_1) * layerThicknessCur(:,:)
+
       ! Compute fast tendencies for normal velocity
       call mpas_timer_start("FB_LTS compute fast tendencies")
       call mpas_timer_start("FB_LTS compute fast velocity tendencies")
 
-      call ocn_lts_vel_tend(statePool, LTSPool, tendPool, 1, 0, 1, 1, 1)
+      call ocn_lts_vel_tend(LTSPool, tendPool, &
+                            normalVelocityCur, layerThicknessForTend, &
+                            0, 1, 1, 1, 1)
 
       call mpas_timer_stop("FB_LTS compute fast velocity tendencies")
       call mpas_timer_stop("FB_LTS compute fast tendencies")
@@ -579,11 +592,19 @@ module ocn_time_integration_fblts
       ! Compute the second stage of the normal velocity on fine*, 
       ! interface 1, interface 2, and coarse
       
+      ! Perform forward-backward average of thickness for stage two of 
+      ! FB-RK(3,2):
+      ! h = weight2*stage2 + (1-weight2)*current
+      layerThicknessForTend(:,:) = config_fb_weight_2 * layerThicknessSecondStage(:,:) &
+                                   + (1 - config_fb_weight_2) * layerThicknessCur(:,:)
+      
       ! Compute fast tendencies for normal velocity
       call mpas_timer_start("FB_LTS compute fast tendencies")
       call mpas_timer_start("FB_LTS compute fast velocity tendencies")
 
-      call ocn_lts_vel_tend(statePool, LTSPool, tendPool, 2, 0, 1, 1, 1)
+      call ocn_lts_vel_tend(LTSPool, tendPool, &
+                            normalVelocityFirstStage, layerThicknessForTend, &
+                            0, 1, 1, 1, 1)
 
       call mpas_timer_stop("FB_LTS compute fast velocity tendencies")
       call mpas_timer_stop("FB_LTS compute fast tendencies")
@@ -699,14 +720,21 @@ module ocn_time_integration_fblts
       ! BEGIN: Normal velocity stage 3
       ! Compute the third stage of the normal velocity on, interface 1, 
       ! and coarse
-      ! For now we compute on interface 2 as well, but this can/should
-      ! be removed later
 
+      ! Perform forward-backward average of thickness for stage one of 
+      ! FB-RK(3,2):
+      ! h = weight3*new + (1-2*weight3)*secondStage + weight3*current
+      layerThicknessForTend(:,:) = config_fb_weight_3 * layerThicknessNew(:,:) &
+                                   + (1 - 2*config_fb_weight_3) * layerThicknessSecondStage(:,:) &
+                                   + config_fb_weight_3 * layerThicknessCur(:,:)
+      
       ! Compute fast tendencies for normal velocity
       call mpas_timer_start("FB_LTS compute fast tendencies")
       call mpas_timer_start("FB_LTS compute fast velocity tendencies")
 
-      call ocn_lts_vel_tend(statePool, LTSPool, tendPool, 3, 0, 0, 1, 1)
+      call ocn_lts_vel_tend(LTSPool, tendPool, &
+                            normalVelocitySecondStage, layerThicknessForTend, &
+                            0, 0, 1, 0, 1)
 
       call mpas_timer_stop("FB_LTS compute fast velocity tendencies")
       call mpas_timer_stop("FB_LTS compute fast tendencies")
@@ -1203,22 +1231,26 @@ module ocn_time_integration_fblts
 !
 !-----------------------------------------------------------------------
 
-   subroutine ocn_lts_vel_tend(statePool, LTSPool, tendPool, stage, computeOnFineBig, &
-                               computeOnFineSmall, computeOnCoarse, computeOnInterface)!{{{
+   subroutine ocn_lts_vel_tend(LTSPool, tendPool, &
+                               normalVelocity, layerThickness, &
+                               computeOnFineInterior, computeOnFineInterfaceAdjacent, &
+                               computeOnInterfaceOne, computeOnInterfaceTwo, &
+                               computeOnCoarse)!{{{
       
       !-----------------------------------------------------------------
       ! Input variables
       !-----------------------------------------------------------------
       
       integer, intent(in) :: &
-         stage, &
-         computeOnFineBig, &
-         computeOnFineSmall, &
-         computeOnCoarse, &
-         computeOnInterface
+         computeOnFineInterior, &
+         computeOnFineInterfaceAdjacent, &
+         computeOnInterfaceOne, &
+         computeOnInterfaceTwo, &
+         computeOnCoarse
 
-      type (mpas_pool_type), intent(in) :: &
-         statePool  !< Input: state variables
+      real (kind=RKIND), dimension(:,:), pointer :: &
+         layerThickness, &
+         normalVelocity
 
       type (mpas_pool_type), intent(in) :: &
          LTSPool  !< Input: LTS data
@@ -1240,21 +1272,15 @@ module ocn_time_integration_fblts
       integer, dimension(:,:,:), pointer :: &
          edgesInLTSRegion
       
-      real (kind=RKIND), dimension(:), pointer :: &
+      real (kind=RKIND), dimension(nCellsAll) :: &
          ssh
       
       real (kind=RKIND), dimension(:,:), pointer :: &
-         normalVelocityTend, &
-         normalVelocity, & 
-         layerThickness, &
-         layerThicknessCur, &
-         layerThicknessNew, &
-         layerThicknessFirstStage, &
-         layerThicknessSecondStage
+         normalVelocityTend
 
       integer :: &
-         iEdge, cell1, cell2, k, ie, iRegion, nRegions, &
-         ic, i, iCell, kmin, kmax, timeLevelVelocity
+         iEdge, cell1, cell2, k, ie, &
+         ic, i, iCell, kmin, kmax
 
       real (kind=RKIND) :: &
          invdcEdge, betaSelfAttrLoad, flux, ssh_sal_on
@@ -1264,59 +1290,14 @@ module ocn_time_integration_fblts
       !-----------------------------------------------------------------
       
       betaSelfAttrLoad = config_self_attraction_and_loading_beta
-      nRegions = 2
-
-      ! Depending on which RK stage, calculate the forward-backward
-      ! average of the layer thickness to use in the tendency
-      ! calculations
-      ! Stage 1: h = weight1*firstStage + (1-weight1)*current
-      ! Stage 2: h = weight2*secondStage + (1-weight2)*current
-      ! Stage 3: h = weight3*new + (1-2*weight3)*secondStage + weight3*current
-      ! Also, set the desired timeLevel for normalVelocity
-      if (stage == 1) then
-         timeLevelVelocity = 1
-
-         call mpas_pool_get_array(statePool, 'layerThickness', &
-                                  layerThicknessCur, 1)
-         call mpas_pool_get_array(statePool, 'layerThickness', &
-                                  layerThicknessFirstStage, 3)
-
-         layerThickness(:,:) = config_fb_weight_1 * layerThicknessFirstStage(:,:) &
-                               + (1 - config_fb_weight_1) * layerThicknessCur(:,:)
-      else if (stage == 2) then
-         timeLevelVelocity = 3
-
-         call mpas_pool_get_array(statePool, 'layerThickness', &
-                                  layerThicknessCur, 1)
-         call mpas_pool_get_array(statePool, 'layerThickness', &
-                                  layerThicknessSecondStage, 4)
-
-         layerThickness(:,:) = config_fb_weight_2 * layerThicknessSecondStage(:,:) &
-                               + (1 - config_fb_weight_2) * layerThicknessCur(:,:)
-      else if (stage == 3) then
-         timeLevelVelocity = 4
-
-         call mpas_pool_get_array(statePool, 'layerThickness', &
-                                  layerThicknessCur, 1)
-         call mpas_pool_get_array(statePool, 'layerThickness', &
-                                  layerThicknessSecondStage, 4)
-         call mpas_pool_get_array(statePool, 'layerThickness', &
-                                  layerThicknessNew, 2)
-
-         layerThickness(:,:) = config_fb_weight_3 * layerThicknessNew(:,:) &
-                               + (1 - 2*config_fb_weight_3) * layerThicknessSecondStage(:,:) &
-                               + config_fb_weight_3 * layerThicknessCur(:,:)
-      end if
 
       call mpas_pool_get_array(LTSPool, 'edgesInLTSRegion', edgesInLTSRegion)
       call mpas_pool_get_array(LTSPool, 'nEdgesInLTSRegion', nEdgesInLTSRegion)
 
       call mpas_pool_get_array(tendPool, 'normalVelocity', normalVelocityTend)
 
-      call mpas_pool_get_array(statePool, 'normalVelocity', &
-                               normalVelocity, timeLevelVelocity)
-      call mpas_pool_get_array(statePool, 'ssh', &
-                               ssh, timeLevelVelocity)
+      !call mpas_pool_get_array(statePool, 'ssh', &
+      !                         ssh, timeLevelVelocity)
 
       if (config_use_self_attraction_loading) then
          ssh_sal_on = 1.0_RKIND
@@ -1329,7 +1310,7 @@ module ocn_time_integration_fblts
          k = maxLevelCell(iCell)
          zTop(k:nVertLevels,iCell) = -bottomDepth(iCell) + layerThickness(k,iCell)
          do k = maxLevelCell(iCell)-1, minLevelCell(iCell), -1
-            zTop(k,iCell) = zTop(k+1,iCell) + layerThickness(k  ,iCell)
+            zTop(k,iCell) = zTop(k+1,iCell) + layerThickness(k,iCell)
          end do
          ! copy zTop(1,iCell) into sea-surface height array
          ssh(iCell) = zTop(minLevelCell(iCell),iCell)
@@ -1337,29 +1318,8 @@ module ocn_time_integration_fblts
 
       normalVelocityTend(:,:) = 0.0_RKIND
 
-      ! Interface regions
-      if (computeOnInterface == 1) then
-         do iRegion = 1, nRegions
-            do ie = 1, nEdgesInLTSRegion(iRegion,2)
-               iEdge = edgesInLTSRegion(iRegion,2,ie)
-               cell1 = cellsOnEdge(1,iEdge)
-               cell2 = cellsOnEdge(2,iEdge)
-               invdcEdge = 1.0_RKIND / dcEdge(iEdge)
-               kMin = minLevelEdgeBot(iEdge)
-               kMax = maxLevelEdgeTop(iEdge)
-               do k=kMin,kMax
-                  normalVelocityTend(k,iEdge) = normalVelocityTend(k,iEdge) &
-                                                - edgeMask(k,iEdge) * invdcEdge &
-                                                * ( gravity * ( (ssh(cell2) - ssh(cell1)) &
-                                                - (1.0_RKIND - ssh_sal_on) * betaSelfAttrLoad &
-                                                * (ssh(cell2) - ssh(cell1)) ) )
-               end do
-            end do
-         end do
-      end if
-
       ! Fine in the interior, away from interface 1
-      if (computeOnFineBig == 1) then
+      if (computeOnFineInterior == 1) then
          do ie = 1, nEdgesInLTSRegion(1,1)
             iEdge = edgesInLTSRegion(1,1,ie)
             cell1 = cellsOnEdge(1,iEdge)
@@ -1378,9 +1338,47 @@ module ocn_time_integration_fblts
       end if
 
       ! Fine adjacent to interface 1
-      if (computeOnFineSmall == 1) then
+      if (computeOnFineInterfaceAdjacent == 1) then
          do ie = 1, nEdgesInLTSRegion(1,3)
             iEdge = edgesInLTSRegion(1,3,ie)
+            cell1 = cellsOnEdge(1,iEdge)
+            cell2 = cellsOnEdge(2,iEdge)
+            invdcEdge = 1.0_RKIND / dcEdge(iEdge)
+            kMin = minLevelEdgeBot(iEdge)
+            kMax = maxLevelEdgeTop(iEdge)
+            do k=kMin,kMax
+               normalVelocityTend(k,iEdge) = normalVelocityTend(k,iEdge) &
+                                             - edgeMask(k,iEdge) * invdcEdge &
+                                             * ( gravity * ( (ssh(cell2) - ssh(cell1)) &
+                                             - (1.0_RKIND - ssh_sal_on) * betaSelfAttrLoad &
+                                             * (ssh(cell2) - ssh(cell1)) ) )
+            end do
+         end do
+      end if
+
+      ! Interface 1
+      if (computeOnInterfaceOne == 1) then
+         do ie = 1, nEdgesInLTSRegion(1,2)
+            iEdge = edgesInLTSRegion(1,2,ie)
+            cell1 = cellsOnEdge(1,iEdge)
+            cell2 = cellsOnEdge(2,iEdge)
+            invdcEdge = 1.0_RKIND / dcEdge(iEdge)
+            kMin = minLevelEdgeBot(iEdge)
+            kMax = maxLevelEdgeTop(iEdge)
+            do k=kMin,kMax
+               normalVelocityTend(k,iEdge) = normalVelocityTend(k,iEdge) &
+                                             - edgeMask(k,iEdge) * invdcEdge &
+                                             * ( gravity * ( (ssh(cell2) - ssh(cell1)) &
+                                             - (1.0_RKIND - ssh_sal_on) * betaSelfAttrLoad &
+                                             * (ssh(cell2) - ssh(cell1)) ) )
+            end do
+         end do
+      end if
+
+      ! Interface 2
+      if (computeOnInterfaceTwo == 1) then
+         do ie = 1, nEdgesInLTSRegion(2,2)
+            iEdge = edgesInLTSRegion(2,2,ie)
             cell1 = cellsOnEdge(1,iEdge)
             cell2 = cellsOnEdge(2,iEdge)
             invdcEdge = 1.0_RKIND / dcEdge(iEdge)
