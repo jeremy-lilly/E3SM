@@ -1253,10 +1253,43 @@ module ocn_time_integration_fblts
       ! BEGIN INTERFACE CORRECTION
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+      ! Calculate the corrected solution in the interface layers
+      call mpas_timer_start("FB_LTS interface correction")
+   
+      ! Perform the correction on interface 1 and 2
+      do iRegion = 1, nRegions
+         ! Normal velocity correction
+         do ie = 1, nEdgesInLTSRegion(iRegion,2)
+            iEdge = edgesInLTSRegion(iRegion,2,ie)
+            normalVelocityNew(:,iEdge) = normalVelocityCur(:,iEdge) &
+                                         + dtFine * normalVelocityTendSum3rd(:,iEdge)
+         end do
+         ! Layer thickness correction
+         do ic = 1, nCellsInLTSRegion(iRegion,2)
+            iCell = cellsInLTSRegion(iRegion,2,ic)
+            layerThicknessNew(:,iCell) = layerThicknessCur(:,iCell) &
+                                         + dtFine * layerThicknessTendSum3rd(:,iCell)
+         end do
+      end do
+
+      call mpas_timer_stop("FB_LTS interface correction")
 
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! END INTERFACE CORRECTION
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      
+      ! Final prognostic halo update 
+      call mpas_timer_start("FB_LTS prognostic halo update")
+
+      call mpas_timer_start("FB_LTS velocity halo update")
+      call mpas_dmpar_field_halo_exch(domain, 'normalVelocity', timeLevel=2)
+      call mpas_timer_stop("FB_LTS velocity halo update")
+      
+      call mpas_timer_start("FB_LTS thickness halo update")
+      call mpas_dmpar_field_halo_exch(domain, 'layerThickness', timeLevel=2)
+      call mpas_timer_stop("FB_LTS thickness halo update")
+
+      call mpas_timer_stop("FB_LTS prognostic halo update")
     
       call mpas_timer_stop("FB_LTS main loop")
       
