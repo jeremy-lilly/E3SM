@@ -144,16 +144,13 @@ module ocn_time_integration_fblts
          normalVelocityNew, &  ! normal velocity at time n+1
          normalVelocityFirstStage, &  ! normal velocity at first stage of LTS
          normalVelocitySecondStage, &  ! normal velocity at second stage of LTS
+         normalVelocityForTend, &  ! extra variable to store averages of data for tends calculations
          layerThicknessCur, &  ! layer thickness at time n
          layerThicknessNew, &  ! layer thickness at time n+1
          layerThicknessFirstStage, &  ! layer thickness at first stage of LTS
-         layerThicknessSecondStage  ! layer thickness at second stage of LTS
+         layerThicknessSecondStage, &  ! layer thickness at second stage of LTS
+         layerThicknessForTend  ! extra variable to store averages of data for tends calculations
       
-      ! Extra pointers to store FB averages and interpolations of data stored in the state pool 
-      real (kind=RKIND), dimension(:,:), pointer :: &
-         normalVelocityForTend, &
-         layerThicknessForTend
-
       ! LTS objects
       real (kind=RKIND) :: &
          dtFine, &  ! fine dt, defined as dt / M
@@ -216,6 +213,8 @@ module ocn_time_integration_fblts
                                            normalVelocityFirstStage, 3)
       call mpas_pool_get_array(statePool, 'normalVelocity', &
                                            normalVelocitySecondStage, 4)
+      call mpas_pool_get_array(statePool, 'normalVelocity', &
+                                           normalVelocityForTend, 5)
       call mpas_pool_get_array(statePool, 'layerThickness', &
                                            layerThicknessCur, 1)
       call mpas_pool_get_array(statePool, 'layerThickness', &
@@ -224,6 +223,8 @@ module ocn_time_integration_fblts
                                            layerThicknessFirstStage, 3)
       call mpas_pool_get_array(statePool, 'layerThickness', &
                                            layerThicknessSecondStage, 4)
+      call mpas_pool_get_array(statePool, 'layerThickness', &
+                                           layerThicknessForTend, 5)
       
       ! Retrieve tendency variables
       call mpas_pool_get_array(tendPool, 'normalVelocity', normalVelocityTend)
@@ -264,6 +265,10 @@ module ocn_time_integration_fblts
                                                 normalVelocityTendSum3rd)
       call mpas_pool_get_array(tendSum3rdPool, 'layerThickness', &
                                                 layerThicknessTendSum3rd)
+      
+      ! not sure if we need this yet -- also need to dealloc if used!
+      !allocate(normalVelocityForTend(nVertLevels,nEdgesAll))
+      !allocate(layerThicknessForTend(nVertLevels,nCellsAll))
       
       ! Init variables
       do iEdge = 1, nEdgesAll  ! do we need this?
@@ -445,15 +450,6 @@ module ocn_time_integration_fblts
       call mpas_timer_stop("FB_LTS advance thickness solution")
       call mpas_timer_stop("FB_LTS advance solution")
 
-      ! Halo update
-      call mpas_timer_start("FB_LTS prognostic halo update")
-      call mpas_timer_start("FB_LTS thickness halo update")
-      
-      call mpas_dmpar_field_halo_exch(domain, 'layerThickness', timeLevel=3)
-      
-      call mpas_timer_stop("FB_LTS thickness halo update")
-      call mpas_timer_stop("FB_LTS prognostic halo update")
-
       ! END: Thickness stage 1
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -468,6 +464,17 @@ module ocn_time_integration_fblts
       ! h = weight1*stage1 + (1-weight1)*current
       layerThicknessForTend(:,:) = config_fb_weight_1 * layerThicknessFirstStage(:,:) &
                                     + (1 - config_fb_weight_1) * layerThicknessCur(:,:)
+      
+      ! Halo update before tend calculation
+      ! Might be able to remove this?
+      call mpas_timer_start("FB_LTS prognostic halo update")
+      call mpas_timer_start("FB_LTS thickness halo update")
+      
+      ! Don't need to update normalVelocityCur, already updated
+      call mpas_dmpar_field_halo_exch(domain, 'layerThickness', timeLevel=5)
+      
+      call mpas_timer_stop("FB_LTS thickness halo update")
+      call mpas_timer_stop("FB_LTS prognostic halo update")
 
       ! Compute fast tendencies for normal velocity
       call mpas_timer_start("FB_LTS compute fast tendencies")
@@ -511,15 +518,6 @@ module ocn_time_integration_fblts
       call mpas_timer_start("FB_LTS advance velocity solution")
       call mpas_timer_start("FB_LTS advance solution")
 
-      ! Halo update
-      call mpas_timer_start("FB_LTS prognostic halo update")
-      call mpas_timer_start("FB_LTS velocity halo update")
-      
-      call mpas_dmpar_field_halo_exch(domain, 'normalVelocity', timeLevel=3)
-      
-      call mpas_timer_stop("FB_LTS velocity halo update")
-      call mpas_timer_stop("FB_LTS prognostic halo update")
-
       ! END: Normal velocity stage 1
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       
@@ -528,6 +526,16 @@ module ocn_time_integration_fblts
       ! BEGIN: Thickness stage 2
       ! Compute the second stage of the thickness on fine*, interface 1, 
       ! interface 2, and coarse
+
+      ! Halo update before tend calculation
+      call mpas_timer_start("FB_LTS prognostic halo update")
+      call mpas_timer_start("FB_LTS velocity halo update")
+      
+      call mpas_dmpar_field_halo_exch(domain, 'normalVelocity', timeLevel=3)
+      call mpas_dmpar_field_halo_exch(domain, 'layerThickness', timeLevel=3)
+      
+      call mpas_timer_stop("FB_LTS velocity halo update")
+      call mpas_timer_stop("FB_LTS prognostic halo update")
 
       ! Compute fast tendencies for thickness
       call mpas_timer_start("FB_LTS compute fast tendencies")
@@ -573,16 +581,7 @@ module ocn_time_integration_fblts
 
       call mpas_timer_stop("FB_LTS advance thickness solution")
       call mpas_timer_stop("FB_LTS advance solution")
-
-      ! Halo update
-      call mpas_timer_start("FB_LTS prognostic halo update")
-      call mpas_timer_start("FB_LTS thickness halo update")
       
-      call mpas_dmpar_field_halo_exch(domain, 'layerThickness', timeLevel=4)
-      
-      call mpas_timer_stop("FB_LTS thickness halo update")
-      call mpas_timer_stop("FB_LTS prognostic halo update")
-
       ! END: Thickness stage 2
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       
@@ -598,6 +597,17 @@ module ocn_time_integration_fblts
       layerThicknessForTend(:,:) = config_fb_weight_2 * layerThicknessSecondStage(:,:) &
                                    + (1 - config_fb_weight_2) * layerThicknessCur(:,:)
       
+      ! Halo update before tend calculation
+      ! Might be able to remove this?
+      call mpas_timer_start("FB_LTS prognostic halo update")
+      call mpas_timer_start("FB_LTS thickness halo update")
+      
+      ! Don't need to update normalVelocityFirstStage, previously updated
+      call mpas_dmpar_field_halo_exch(domain, 'layerThickness', timeLevel=5)
+      
+      call mpas_timer_stop("FB_LTS thickness halo update")
+      call mpas_timer_stop("FB_LTS prognostic halo update")
+ 
       ! Compute fast tendencies for normal velocity
       call mpas_timer_start("FB_LTS compute fast tendencies")
       call mpas_timer_start("FB_LTS compute fast velocity tendencies")
@@ -640,15 +650,7 @@ module ocn_time_integration_fblts
       call mpas_timer_start("FB_LTS advance velocity solution")
       call mpas_timer_start("FB_LTS advance solution")
 
-      ! Halo update
-      call mpas_timer_start("FB_LTS prognostic halo update")
-      call mpas_timer_start("FB_LTS velocity halo update")
       
-      call mpas_dmpar_field_halo_exch(domain, 'normalVelocity', timeLevel=4)
-      
-      call mpas_timer_stop("FB_LTS velocity halo update")
-      call mpas_timer_stop("FB_LTS prognostic halo update")
-
       ! END: Normal velocity stage 2
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       
@@ -657,6 +659,16 @@ module ocn_time_integration_fblts
       ! BEGIN: Thickness stage 3
       ! Compute the third stage of the thickness on fine*, interface 1, 
       ! interface 2, and coarse
+
+      ! Halo update before tends calculation
+      call mpas_timer_start("FB_LTS prognostic halo update")
+      call mpas_timer_start("FB_LTS velocity halo update")
+      
+      call mpas_dmpar_field_halo_exch(domain, 'normalVelocity', timeLevel=4)
+      call mpas_dmpar_field_halo_exch(domain, 'layerThickness', timeLevel=4)
+      
+      call mpas_timer_stop("FB_LTS velocity halo update")
+      call mpas_timer_stop("FB_LTS prognostic halo update")
 
       ! Compute fast tendencies for thickness
       call mpas_timer_start("FB_LTS compute fast tendencies")
@@ -703,15 +715,6 @@ module ocn_time_integration_fblts
       call mpas_timer_stop("FB_LTS advance thickness solution")
       call mpas_timer_stop("FB_LTS advance solution")
 
-      ! Halo update
-      call mpas_timer_start("FB_LTS prognostic halo update")
-      call mpas_timer_start("FB_LTS thickness halo update")
-      
-      call mpas_dmpar_field_halo_exch(domain, 'layerThickness', timeLevel=2)
-      
-      call mpas_timer_stop("FB_LTS thickness halo update")
-      call mpas_timer_stop("FB_LTS prognostic halo update")
-     
       ! END: Thickness stage 3
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       
@@ -727,6 +730,17 @@ module ocn_time_integration_fblts
       layerThicknessForTend(:,:) = config_fb_weight_3 * layerThicknessNew(:,:) &
                                    + (1 - 2*config_fb_weight_3) * layerThicknessSecondStage(:,:) &
                                    + config_fb_weight_3 * layerThicknessCur(:,:)
+      
+      ! Halo update before tend calculation
+      ! Might be able to remove this?
+      call mpas_timer_start("FB_LTS prognostic halo update")
+      call mpas_timer_start("FB_LTS thickness halo update")
+      
+      ! Don't need to update normalVelocitySecondStage, previously updated
+      call mpas_dmpar_field_halo_exch(domain, 'layerThickness', timeLevel=5)
+      
+      call mpas_timer_stop("FB_LTS thickness halo update")
+      call mpas_timer_stop("FB_LTS prognostic halo update")
       
       ! Compute fast tendencies for normal velocity
       call mpas_timer_start("FB_LTS compute fast tendencies")
@@ -760,17 +774,12 @@ module ocn_time_integration_fblts
          normalVelocityNew(:,iEdge) = normalVelocityCur(:,iEdge) &
                                       + dt * normalVelocityTend(:,iEdge)
       end do
-      ! Fine layers close to interface layers
-      !do ie = 1, nEdgesInLTSRegion(1,3)
-      !   iEdge = edgesInLTSRegion(1,3,ie)
-      !   normalVelocityNew(:,iEdge) = normalVelocityCur(:,iEdge) &
-      !                                + dt * normalVelocityTend(:,iEdge)
-      !end do
       
       call mpas_timer_start("FB_LTS advance velocity solution")
       call mpas_timer_start("FB_LTS advance solution")
 
       ! Halo update
+      ! Might be able to remove this?
       call mpas_timer_start("FB_LTS prognostic halo update")
       call mpas_timer_start("FB_LTS velocity halo update")
       
@@ -790,11 +799,76 @@ module ocn_time_integration_fblts
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! BEGIN FINE ADVANCEMENT
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      do im = 1,M
+      do im = 0, M-1
 
          !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
          ! BEGIN: Thickness stage 1
          ! Compute the first stage of the thickness on fine
+
+         ! Calculate predicted 'current' data at intermediate 
+         ! time-level on interface 1:
+         ! (u,h) = (im/M)*new + (1- (im/M))*current
+         call mpas_timer_start('FB_LTS interface prediction')
+
+         normalVelocityForTend(:,:) = normalVelocityCur(:,:)
+         do ie = 1, nEdgesInLTSRegion(1,2)
+            iEdge = edgesInLTSRegion(1,2,ie)
+            normalVelocityForTend(:,iEdge) = (im/M) * normalVelocityNew(:,iEdge) &
+                                             + (1 - (im/M)) * normalVelocityCur(:,iEdge)
+         end do
+
+         layerThicknessForTend(:,:) = layerThicknessCur(:,:)
+         do ic = 1, nCellsInLTSRegion(1,2)
+            iCell = cellsInLTSRegion(1,2,ic)
+            layerThicknessForTend(:,iCell) = (im/M) * layerThicknessNew(:,iCell) &
+                                             + (1 - (im/M)) * layerThicknessCur(:,iCell)
+         end do
+
+         call mpas_timer_stop('FB_LTS interface prediction')
+         
+         ! Compute fast tendencies for thickness
+         call mpas_timer_start("FB_LTS compute fast tendencies")
+         call mpas_timer_start("FB_LTS compute fast thickness tendencies")
+
+         call ocn_lts_thick_tend(LTSPool, tendPool, & 
+                                 normalVelocityForTend, layerThicknessForTend, &
+                                 1, 1, 0, 0, 0)
+
+         call mpas_timer_stop("FB_LTS compute fast thickness tendencies")
+         call mpas_timer_stop("FB_LTS compute fast tendencies")
+
+         ! Advance thickness solution with first stage
+         call mpas_timer_start("FB_LTS advance solution")
+         call mpas_timer_start("FB_LTS advance thickness solution")
+         
+         ! Fine cells adjacent to interface 1
+         do ic = 1, nCellsInLTSRegion(1,3)
+            iCell = cellsInLTSRegion(1,3,ic)
+            do k = 1, maxLevelCell(iCell)
+               layerThicknessFirstStage(k,iCell) = layerThicknessCur(k,iCell) &
+                                                   + weight1st * dt * layerThicknessTend(k,iCell)
+            end do
+         end do
+         ! Fine in the interior, away from interface 1
+         do ic = 1, nCellsInLTSRegion(1,1)
+            iCell = cellsInLTSRegion(1,1,ic)
+            do k = 1, maxLevelCell(iCell)
+               layerThicknessFirstStage(k,iCell) = layerThicknessCur(k,iCell) &
+                                                   + weight1st * dt * layerThicknessTend(k,iCell)
+            end do
+         end do
+
+         call mpas_timer_stop("FB_LTS advance thickness solution")
+         call mpas_timer_stop("FB_LTS advance solution")
+
+         ! Halo update
+         !call mpas_timer_start("FB_LTS prognostic halo update")
+         !call mpas_timer_start("FB_LTS thickness halo update")
+         
+         !call mpas_dmpar_field_halo_exch(domain, 'layerThickness', timeLevel=1)
+         
+         !call mpas_timer_stop("FB_LTS thickness halo update")
+         !call mpas_timer_stop("FB_LTS prognostic halo update")
       
          ! END: Thickness stage 1
          !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
