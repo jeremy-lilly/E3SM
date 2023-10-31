@@ -424,27 +424,21 @@ module ocn_time_integration_fblts
       do iRegion = 1,nRegions
          do ic = 1, nCellsInLTSRegion(iRegion,2)
             iCell = cellsInLTSRegion(iRegion,2,ic)
-            do k = 1, maxLevelCell(iCell)
-               layerThicknessFirstStage(k,iCell) = layerThicknessCur(k,iCell) &
-                                                   + weight1st * dt * layerThicknessTend(k,iCell)
-            end do
+            layerThicknessFirstStage(:,iCell) = layerThicknessCur(:,iCell) &
+                                                + weight1st * dt * layerThicknessTend(:,iCell)
          end do
       end do
       ! Coarse
       do ic = 1, nCellsInLTSRegion(2,1)
          iCell = cellsInLTSRegion(2,1,ic)
-         do k = 1, maxLevelCell(iCell)
-            layerThicknessFirstStage(k,iCell) = layerThicknessCur(k,iCell) &
-                                                + weight1st * dt * layerThicknessTend(k,iCell)
-         end do
+         layerThicknessFirstStage(:,iCell) = layerThicknessCur(:,iCell) &
+                                             + weight1st * dt * layerThicknessTend(:,iCell)
       end do
       ! Fine layers close to interface layers
       do ic = 1, nCellsInLTSRegion(1,3)
          iCell = cellsInLTSRegion(1,3,ic)
-         do k = 1, maxLevelCell(iCell)
-            layerThicknessFirstStage(k,iCell) = layerThicknessCur(k,iCell) &
-                                                + weight1st * dt * layerThicknessTend(k,iCell)
-         end do
+         layerThicknessFirstStage(:,iCell) = layerThicknessCur(:,iCell) &
+                                             + weight1st * dt * layerThicknessTend(:,iCell)
       end do
 
       call mpas_timer_stop("FB_LTS advance thickness solution")
@@ -556,27 +550,21 @@ module ocn_time_integration_fblts
       do iRegion = 1,nRegions
          do ic = 1, nCellsInLTSRegion(iRegion,2)
             iCell = cellsInLTSRegion(iRegion,2,ic)
-            do k = 1, maxLevelCell(iCell)
-               layerThicknessSecondStage(k,iCell) = layerThicknessCur(k,iCell) &
-                                                    + weight2nd * dt * layerThicknessTend(k,iCell)
-            end do
+            layerThicknessSecondStage(:,iCell) = layerThicknessCur(:,iCell) &
+                                                 + weight2nd * dt * layerThicknessTend(:,iCell)
          end do
       end do
       ! Coarse
       do ic = 1, nCellsInLTSRegion(2,1)
          iCell = cellsInLTSRegion(2,1,ic)
-         do k = 1, maxLevelCell(iCell)
-            layerThicknessSecondStage(k,iCell) = layerThicknessCur(k,iCell) &
-                                                 + weight2nd * dt * layerThicknessTend(k,iCell)
-         end do
+         layerThicknessSecondStage(:,iCell) = layerThicknessCur(:,iCell) &
+                                              + weight2nd * dt * layerThicknessTend(:,iCell)
       end do
       ! Fine layers close to interface layers
       do ic = 1, nCellsInLTSRegion(1,3)
          iCell = cellsInLTSRegion(1,3,ic)
-         do k = 1, maxLevelCell(iCell)
-            layerThicknessSecondStage(k,iCell) = layerThicknessCur(k,iCell) &
-                                                 + weight2nd * dt * layerThicknessTend(k,iCell)
-         end do
+         layerThicknessSecondStage(:,iCell) = layerThicknessCur(:,iCell) &
+                                              + weight2nd * dt * layerThicknessTend(:,iCell)
       end do
 
       call mpas_timer_stop("FB_LTS advance thickness solution")
@@ -688,27 +676,21 @@ module ocn_time_integration_fblts
       do iRegion = 1,nRegions
          do ic = 1, nCellsInLTSRegion(iRegion,2)
             iCell = cellsInLTSRegion(iRegion,2,ic)
-            do k = 1, maxLevelCell(iCell)
-               layerThicknessNew(k,iCell) = layerThicknessCur(k,iCell) &
-                                            + dt * layerThicknessTend(k,iCell)
-            end do
+            layerThicknessNew(:,iCell) = layerThicknessCur(:,iCell) &
+                                         + dt * layerThicknessTend(:,iCell)
          end do
       end do
       ! Coarse
       do ic = 1, nCellsInLTSRegion(2,1)
          iCell = cellsInLTSRegion(2,1,ic)
-         do k = 1, maxLevelCell(iCell)
-            layerThicknessNew(k,iCell) = layerThicknessCur(k,iCell) &
-                                         + dt * layerThicknessTend(k,iCell)
-         end do
+         layerThicknessNew(:,iCell) = layerThicknessCur(:,iCell) &
+                                      + dt * layerThicknessTend(:,iCell)
       end do
       ! Fine layers close to interface layers
       do ic = 1, nCellsInLTSRegion(1,3)
          iCell = cellsInLTSRegion(1,3,ic)
-         do k = 1, maxLevelCell(iCell)
-            layerThicknessNew(k,iCell) = layerThicknessCur(k,iCell) &
-                                         +  dt * layerThicknessTend(k,iCell)
-         end do
+         layerThicknessNew(:,iCell) = layerThicknessCur(:,iCell) &
+                                      +  dt * layerThicknessTend(:,iCell)
       end do
 
       call mpas_timer_stop("FB_LTS advance thickness solution")
@@ -853,18 +835,14 @@ module ocn_time_integration_fblts
          ! Fine cells adjacent to interface 1
          do ic = 1, nCellsInLTSRegion(1,3)
             iCell = cellsInLTSRegion(1,3,ic)
-            do k = 1, maxLevelCell(iCell)
-               layerThicknessFirstStage(k,iCell) = layerThicknessCur(k,iCell) &
-                                                   + weight1st * dtFine * layerThicknessTend(k,iCell)
-            end do
+            layerThicknessFirstStage(:,iCell) = layerThicknessCur(:,iCell) &
+                                                + weight1st * dtFine * layerThicknessTend(:,iCell)
          end do
          ! Fine in the interior, away from interface 1
          do ic = 1, nCellsInLTSRegion(1,1)
             iCell = cellsInLTSRegion(1,1,ic)
-            do k = 1, maxLevelCell(iCell)
-               layerThicknessFirstStage(k,iCell) = layerThicknessCur(k,iCell) &
-                                                   + weight1st * dtFine * layerThicknessTend(k,iCell)
-            end do
+            layerThicknessFirstStage(:,iCell) = layerThicknessCur(:,iCell) &
+                                                + weight1st * dtFine * layerThicknessTend(:,iCell)
          end do
 
          call mpas_timer_stop("FB_LTS advance thickness solution")
@@ -962,7 +940,7 @@ module ocn_time_integration_fblts
          do ie = 1, nEdgesInLTSRegion(1,2)
             iEdge = edgesInLTSRegion(1,2,ie)
             normalVelocityForTend(:,iEdge) = (im/M) * normalVelocityNew(:,iEdge) &
-                                             + (1/M) * normalvelocityFirstStage(:,iEdge) &
+                                             + (1/M) * normalVelocityFirstStage(:,iEdge) &
                                              + (1 - ((im+1)/M)) * normalVelocityCur(:,iEdge)
          end do
 
@@ -997,25 +975,21 @@ module ocn_time_integration_fblts
          call mpas_timer_stop("FB_LTS compute fast thickness tendencies")
          call mpas_timer_stop("FB_LTS compute fast tendencies")
 
-         ! Advance thickness solution with first stage
+         ! Advance thickness solution with second stage
          call mpas_timer_start("FB_LTS advance solution")
          call mpas_timer_start("FB_LTS advance thickness solution")
          
          ! Fine cells adjacent to interface 1
          do ic = 1, nCellsInLTSRegion(1,3)
             iCell = cellsInLTSRegion(1,3,ic)
-            do k = 1, maxLevelCell(iCell)
-               layerThicknessSecondStage(k,iCell) = layerThicknessCur(k,iCell) &
-                                                   + weight2nd * dtFine * layerThicknessTend(k,iCell)
-            end do
+            layerThicknessSecondStage(:,iCell) = layerThicknessCur(:,iCell) &
+                                                 + weight2nd * dtFine * layerThicknessTend(:,iCell)
          end do
          ! Fine in the interior, away from interface 1
          do ic = 1, nCellsInLTSRegion(1,1)
             iCell = cellsInLTSRegion(1,1,ic)
-            do k = 1, maxLevelCell(iCell)
-               layerThicknessSecondStage(k,iCell) = layerThicknessCur(k,iCell) &
-                                                   + weight2nd * dtFine * layerThicknessTend(k,iCell)
-            end do
+            layerThicknessSecondStage(:,iCell) = layerThicknessCur(:,iCell) &
+                                                 + weight2nd * dtFine * layerThicknessTend(:,iCell)
          end do
 
          call mpas_timer_stop("FB_LTS advance thickness solution")
@@ -1104,7 +1078,79 @@ module ocn_time_integration_fblts
          ! BEGIN: Thickness stage 3
          ! Compute the third stage of the thickness on fine and 
          ! increment the third stage interface correction terms
-      
+
+         ! Calculate predicted stage 2 data at intermediate 
+         ! time-level on interface 1:
+         ! u,h = (im/M)*new + (1/M)*secondStage + (1-(im+1)/M)*current
+         call mpas_timer_start('FB_LTS interface prediction')
+
+         normalVelocityForTend(:,:) = normalVelocitySecondStage(:,:)
+         do ie = 1, nEdgesInLTSRegion(1,2)
+            iEdge = edgesInLTSRegion(1,2,ie)
+            normalVelocityForTend(:,iEdge) = (im/M) * normalVelocityNew(:,iEdge) &
+                                             + (1/M) * normalVelocitySecondStage(:,iEdge) &
+                                             + (1 - ((im+1)/M)) * normalVelocityCur(:,iEdge)
+         end do
+
+         layerThicknessForTend(:,:) = layerThicknessSecondStage(:,:)
+         do ic = 1, nCellsInLTSRegion(1,2)
+            iCell = cellsInLTSRegion(1,2,ic)
+            layerThicknessForTend(:,iCell) = (im/M) * layerThicknessNew(:,iCell) &
+                                             + (1/M) * layerThicknessSecondStage(:,iCell) &
+                                             + (1 - ((im+1)/M)) * layerThicknessCur(:,iCell)
+         end do
+
+         call mpas_timer_stop('FB_LTS interface prediction')
+         
+         ! Halo update before tend calculation
+         call mpas_timer_start("FB_LTS prognostic halo update")
+         call mpas_timer_start("FB_LTS thickness halo update")
+         
+         call mpas_dmpar_field_halo_exch(domain, 'normalVelocity', timeLevel=5)
+         call mpas_dmpar_field_halo_exch(domain, 'layerThickness', timeLevel=5)
+         
+         call mpas_timer_stop("FB_LTS thickness halo update")
+         call mpas_timer_stop("FB_LTS prognostic halo update")
+         
+         ! Compute fast tendencies for thickness
+         call mpas_timer_start("FB_LTS compute fast tendencies")
+         call mpas_timer_start("FB_LTS compute fast thickness tendencies")
+
+         call ocn_lts_thick_tend(LTSPool, tendPool, & 
+                                 normalVelocityForTend, layerThicknessForTend, &
+                                 1, 1, 1, 1, 0)
+
+         call mpas_timer_stop("FB_LTS compute fast thickness tendencies")
+         call mpas_timer_stop("FB_LTS compute fast tendencies")
+
+         ! Advance thickness solution with third stage
+         call mpas_timer_start("FB_LTS advance solution")
+         call mpas_timer_start("FB_LTS advance thickness solution")
+
+         ! Increment interface correction terms
+         do iRegion = 1,nRegions
+            do ic = 1, nCellsInLTSRegion(iRegion,2)
+               iCell = cellsInLTSRegion(iRegion,2,ic)
+               layerThicknessTendSum3rd(:,iCell) = layerThicknessTendSum3rd(:,iCell) &
+                                                   + layerThicknessTend(:,iCell)
+            end do
+         end do
+         ! Fine cells adjacent to interface 1
+         do ic = 1, nCellsInLTSRegion(1,3)
+            iCell = cellsInLTSRegion(1,3,ic)
+            layerThicknessNew(:,iCell) = layerThicknessCur(:,iCell) &
+                                          + dtFine * layerThicknessTend(:,iCell)
+         end do
+         ! Fine in the interior, away from interface 1
+         do ic = 1, nCellsInLTSRegion(1,1)
+            iCell = cellsInLTSRegion(1,1,ic)
+            layerThicknessNew(:,iCell) = layerThicknessCur(:,iCell) &
+                                          + dtFine * layerThicknessTend(:,iCell)
+         end do
+
+         call mpas_timer_stop("FB_LTS advance thickness solution")
+         call mpas_timer_stop("FB_LTS advance solution")
+
          ! END: Thickness stage 3
          !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
          
@@ -1112,8 +1158,88 @@ module ocn_time_integration_fblts
          !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
          ! BEGIN: Normal velocity stage 3
          ! Compute the third stage of the normal velocity on fine and 
-         ! increment the thrid stage interface correction terms
-      
+         ! increment the third stage interface correction terms
+
+         ! Perform forward-backward average of thickness for stage three of 
+         ! FB-RK(3,2):
+         ! h = weight3*new + (1-2*weight3)*stageTwo + weight3*current
+         layerThicknessForTend(:,:) = config_fb_weight_3 * layerThicknessNew(:,:) &
+                                      + (1 - 2*config_fb_weight_3) * layerThicknessSecondStage(:,:) &
+                                      + config_fb_weight_3 * layerThicknessCur(:,:)
+
+         ! Calculate predicted FB averaged thickness data at 
+         ! intermediate time-level on interface 1:
+         ! h = weight3*new + (1-2*weight3)*'secondStage' + weight3*'current'
+         !   = weight3*( ((im+1)/M)*new + (1-(im+1)/M)*current )
+         !     + (1-2*weight3)*( (im/M)*new + (1/M)*secondStage + (1-(im+1)/M)*current )
+         !     + weight3*( (im/M)*new + (1-im/M)*current )
+         call mpas_timer_start('FB_LTS interface prediction')
+         
+         do ic = 1, nCellsInLTSRegion(1,2)
+            iCell = cellsInLTSRegion(1,2,ic)
+            layerThicknessForTend(:,iCell) = config_fb_weight_3 &
+                                             * ( ((im+1)/M) * layerThicknessNew(:,iCell) &
+                                               + (1 - ((im+1)/M)) * layerThicknessCur(:,iCell) ) &
+                                             + (1 - 2*config_fb_weight_3) &
+                                             * ( (im/M) * layerThicknessNew(:,iCell) &
+                                               + (1/M) * layerThicknessSecondStage(:,iCell) &
+                                               + (1 - ((im+1)/M)) * layerThicknessCur(:,iCell) ) &
+                                             + config_fb_weight_3 &
+                                             * ( (im/M) * layerThicknessNew(:,iCell) &
+                                               + (1 - (im/M)) * layerThicknessCur(:,iCell) )
+         end do
+         
+         call mpas_timer_stop('FB_LTS interface prediction')
+
+         ! Halo update before tend calculation
+         call mpas_timer_start("FB_LTS prognostic halo update")
+         call mpas_timer_start("FB_LTS thickness halo update")
+         
+         ! Don't need to update normalVelocityForTend, previously updated
+         call mpas_dmpar_field_halo_exch(domain, 'layerThickness', timeLevel=5)
+         
+         call mpas_timer_stop("FB_LTS thickness halo update")
+         call mpas_timer_stop("FB_LTS prognostic halo update")
+         
+         ! Compute fast tendencies for normal velocity
+         call mpas_timer_start("FB_LTS compute fast tendencies")
+         call mpas_timer_start("FB_LTS compute fast velocity tendencies")
+
+         call ocn_lts_vel_tend(LTSPool, tendPool, &
+                               normalVelocityForTend, layerThicknessForTend, &
+                               1, 1, 1, 1, 0)
+
+         call mpas_timer_stop("FB_LTS compute fast velocity tendencies")
+         call mpas_timer_stop("FB_LTS compute fast tendencies")
+
+         ! Advance normal velocity solution with third stage
+         call mpas_timer_start("FB_LTS advance solution")
+         call mpas_timer_start("FB_LTS advance velocity solution")
+
+         ! Increment interface correction terms
+         do iRegion = 1,nRegions
+            do ie = 1, nEdgesInLTSRegion(iRegion,2)
+               iEdge = edgesInLTSRegion(iRegion,2,ie)
+               normalVelocityTendSum3rd(:,iEdge) = normalVelocityTendSum3rd(:,iEdge) &
+                                                   + normalVelocityTend(:,iEdge)
+            end do
+         end do
+         ! Fine cells adjacent to interface 1
+         do ie = 1, nEdgesInLTSRegion(1,3)
+            iEdge = edgesInLTSRegion(1,3,ie)
+            normalVelocityNew(:,iEdge) = normalVelocityCur(:,iEdge) &
+                                         + dtFine * normalVelocityTend(:,iEdge)
+         end do
+         ! Fine in the interior, away from interface 1
+         do ie = 1, nEdgesInLTSRegion(1,1)
+            iEdge = edgesInLTSRegion(1,1,ie)
+            normalVelocityNew(:,iEdge) = normalVelocityCur(:,iEdge) &
+                                         + dtFine * normalVelocityTend(:,iEdge)
+         end do
+         
+         call mpas_timer_stop("FB_LTS advance velocity solution")
+         call mpas_timer_stop("FB_LTS advance solution")
+
          ! END: Normal velocity stage 3
          !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
