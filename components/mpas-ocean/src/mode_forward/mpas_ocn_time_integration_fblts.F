@@ -32,7 +32,7 @@ module ocn_time_integration_fblts
 
    use ocn_constants
    use ocn_tendency
-   !use ocn_diagnostics
+   use ocn_diagnostics
    use ocn_mesh
    use ocn_vmix
    use ocn_config
@@ -1321,9 +1321,68 @@ module ocn_time_integration_fblts
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       
 
-      call mpas_timer_start("FB_LTS cleanup phase")
-      
-      call mpas_timer_stop("FB_LTS cleanup phase")
+      call mpas_timer_start("FB_LTS cleanup")
+
+      if (config_prescribe_velocity) then
+         do iEdge = 1, nEdgesAll
+            normalVelocityNew(:,iEdge) = normalVelocityCur(:,iEdge)
+         end do
+      end if
+
+      if (config_prescribe_thickness) then
+         do iCell = 1, nCellsAll
+            layerThicknessNew(:,iCell) = layerThicknessCur(:,iCell)
+         end do
+      end if
+
+      do iEdge = 1, nEdgesAll
+         normalTransportVelocity(:,iEdge) = normalVelocityNew(:,iEdge)
+      end do
+
+      call mpas_reconstruct(meshPool, normalVelocityNew, &
+                            velocityX, velocityY, velocityZ, &
+                            velocityZonal, velocityMeridional, &
+                            includeHalos = .true.)
+
+      call mpas_reconstruct(meshPool, gradSSH, &
+                            gradSSHX, gradSSHY, gradSSHZ, &
+                            gradSSHZonal, gradSSHMeridional, &
+                            includeHalos = .true.)
+
+      do iCell = 1, nCellsAll
+         surfaceVelocity(indexSurfaceVelocityZonal, iCell) = velocityZonal(1, iCell)
+         surfaceVelocity(indexSurfaceVelocityMeridional, iCell) = velocityMeridional(1, iCell)
+
+         SSHGradient(indexSSHGradientZonal, iCell) = gradSSHZonal(iCell)
+         SSHGradient(indexSSHGradientMeridional, iCell) = gradSSHMeridional(iCell)
+      end do
+
+      call ocn_time_average_coupled_accumulate(statePool, forcingPool, 2)
+
+      do iCell = 1, nCellsAll
+         surfaceVelocity(indexSurfaceVelocityZonal, iCell) = velocityZonal(1, iCell)
+         surfaceVelocity(indexSurfaceVelocityMeridional, iCell) = velocityMeridional(1, iCell)
+
+         SSHGradient(indexSSHGradientZonal, iCell) = gradSSHZonal(iCell)
+         SSHGradient(indexSSHGradientMeridional, iCell) = gradSSHMeridional(iCell)
+      end do
+
+
+      ! Update diagnostics
+      call ocn_diagnostic_solve(dt, statePool, forcingPool, meshPool, &
+                                verticalMeshPool, scratchPool, tracersPool, 2)
+
+      !call mpas_pool_destroy_pool(tendSum1stPool)
+      !call mpas_pool_destroy_pool(tendSum2ndPool)
+      call mpas_pool_destroy_pool(tendSum3rdPool)
+      call mpas_pool_destroy_pool(tendSlowPool)
+
+      !call mpas_pool_remove_subpool(block % structs, 'tend_sum_1st')
+      !call mpas_pool_remove_subpool(block % structs, 'tend_sum_2nd')
+      call mpas_pool_remove_subpool(block % structs, 'tend_sum_3rd')
+      call mpas_pool_remove_subpool(block % structs, 'tend_slow')
+
+      call mpas_timer_stop("FB_LTS cleanup")
 
    end subroutine ocn_time_integrator_fblts!}}}
 
