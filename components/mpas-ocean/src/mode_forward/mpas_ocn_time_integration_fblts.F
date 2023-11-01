@@ -462,12 +462,13 @@ module ocn_time_integration_fblts
       ! Halo update before tend calculation
       ! Might be able to remove this?
       call mpas_timer_start("FB_LTS prognostic halo update")
-      call mpas_timer_start("FB_LTS thickness halo update")
-      
+
       ! Don't need to update normalVelocityCur, already updated
+
+      call mpas_timer_start("FB_LTS thickness halo update")
       call mpas_dmpar_field_halo_exch(domain, 'layerThickness', timeLevel=5)
-      
       call mpas_timer_stop("FB_LTS thickness halo update")
+
       call mpas_timer_stop("FB_LTS prognostic halo update")
 
       ! Compute fast tendencies for normal velocity
@@ -523,12 +524,15 @@ module ocn_time_integration_fblts
 
       ! Halo update before tend calculation
       call mpas_timer_start("FB_LTS prognostic halo update")
+
       call mpas_timer_start("FB_LTS velocity halo update")
-      
       call mpas_dmpar_field_halo_exch(domain, 'normalVelocity', timeLevel=3)
-      call mpas_dmpar_field_halo_exch(domain, 'layerThickness', timeLevel=3)
-      
       call mpas_timer_stop("FB_LTS velocity halo update")
+
+      call mpas_timer_start("FB_LTS thickness halo update")
+      call mpas_dmpar_field_halo_exch(domain, 'layerThickness', timeLevel=3)
+      call mpas_timer_stop("FB_LTS thickness halo update")
+
       call mpas_timer_stop("FB_LTS prognostic halo update")
 
       ! Compute fast tendencies for thickness
@@ -588,12 +592,13 @@ module ocn_time_integration_fblts
       ! Halo update before tend calculation
       ! Might be able to remove this?
       call mpas_timer_start("FB_LTS prognostic halo update")
-      call mpas_timer_start("FB_LTS thickness halo update")
-      
+
       ! Don't need to update normalVelocityFirstStage, previously updated
+
+      call mpas_timer_start("FB_LTS thickness halo update")
       call mpas_dmpar_field_halo_exch(domain, 'layerThickness', timeLevel=5)
-      
       call mpas_timer_stop("FB_LTS thickness halo update")
+
       call mpas_timer_stop("FB_LTS prognostic halo update")
  
       ! Compute fast tendencies for normal velocity
@@ -649,12 +654,15 @@ module ocn_time_integration_fblts
 
       ! Halo update before tends calculation
       call mpas_timer_start("FB_LTS prognostic halo update")
+
       call mpas_timer_start("FB_LTS velocity halo update")
-      
       call mpas_dmpar_field_halo_exch(domain, 'normalVelocity', timeLevel=4)
-      call mpas_dmpar_field_halo_exch(domain, 'layerThickness', timeLevel=4)
-      
       call mpas_timer_stop("FB_LTS velocity halo update")
+
+      call mpas_timer_start("FB_LTS thickness halo update")
+      call mpas_dmpar_field_halo_exch(domain, 'layerThickness', timeLevel=4)
+      call mpas_timer_stop("FB_LTS thickness halo update")
+
       call mpas_timer_stop("FB_LTS prognostic halo update")
 
       ! Compute fast tendencies for thickness
@@ -715,12 +723,13 @@ module ocn_time_integration_fblts
       ! Halo update before tend calculation
       ! Might be able to remove this?
       call mpas_timer_start("FB_LTS prognostic halo update")
-      call mpas_timer_start("FB_LTS thickness halo update")
-      
+
       ! Don't need to update normalVelocitySecondStage, previously updated
+
+      call mpas_timer_start("FB_LTS thickness halo update")
       call mpas_dmpar_field_halo_exch(domain, 'layerThickness', timeLevel=5)
-      
       call mpas_timer_stop("FB_LTS thickness halo update")
+
       call mpas_timer_stop("FB_LTS prognostic halo update")
       
       ! Compute fast tendencies for normal velocity
@@ -762,11 +771,11 @@ module ocn_time_integration_fblts
       ! Halo update
       ! Might be able to remove this?
       call mpas_timer_start("FB_LTS prognostic halo update")
+
       call mpas_timer_start("FB_LTS velocity halo update")
-      
       call mpas_dmpar_field_halo_exch(domain, 'normalVelocity', timeLevel=2)
-      
       call mpas_timer_stop("FB_LTS velocity halo update")
+
       call mpas_timer_stop("FB_LTS prognostic halo update")
 
       ! END: Normal velocity stage 3
@@ -809,12 +818,15 @@ module ocn_time_integration_fblts
          
          ! Halo update before tend calculation
          call mpas_timer_start("FB_LTS prognostic halo update")
-         call mpas_timer_start("FB_LTS thickness halo update")
-         
+
+         call mpas_timer_start("FB_LTS velocity halo update")
          call mpas_dmpar_field_halo_exch(domain, 'normalVelocity', timeLevel=5)
+         call mpas_timer_stop("FB_LTS velocity halo update")
+
+         call mpas_timer_start("FB_LTS thickness halo update")
          call mpas_dmpar_field_halo_exch(domain, 'layerThickness', timeLevel=5)
-         
          call mpas_timer_stop("FB_LTS thickness halo update")
+
          call mpas_timer_stop("FB_LTS prognostic halo update")
          
          ! Compute fast tendencies for thickness
@@ -884,12 +896,13 @@ module ocn_time_integration_fblts
 
          ! Halo update before tend calculation
          call mpas_timer_start("FB_LTS prognostic halo update")
-         call mpas_timer_start("FB_LTS thickness halo update")
-         
+
          ! Don't need to update normalVelocityForTend, previously updated
+
+         call mpas_timer_start("FB_LTS thickness halo update")
          call mpas_dmpar_field_halo_exch(domain, 'layerThickness', timeLevel=5)
-         
          call mpas_timer_stop("FB_LTS thickness halo update")
+
          call mpas_timer_stop("FB_LTS prognostic halo update")
          
          ! Compute fast tendencies for normal velocity
@@ -956,12 +969,15 @@ module ocn_time_integration_fblts
          
          ! Halo update before tend calculation
          call mpas_timer_start("FB_LTS prognostic halo update")
-         call mpas_timer_start("FB_LTS thickness halo update")
-         
+
+         call mpas_timer_start("FB_LTS velocity halo update")
          call mpas_dmpar_field_halo_exch(domain, 'normalVelocity', timeLevel=5)
+         call mpas_timer_stop("FB_LTS velocity halo update")
+
+         call mpas_timer_start("FB_LTS thickness halo update")
          call mpas_dmpar_field_halo_exch(domain, 'layerThickness', timeLevel=5)
-         
          call mpas_timer_stop("FB_LTS thickness halo update")
+
          call mpas_timer_stop("FB_LTS prognostic halo update")
          
          ! Compute fast tendencies for thickness
@@ -1031,12 +1047,13 @@ module ocn_time_integration_fblts
 
          ! Halo update before tend calculation
          call mpas_timer_start("FB_LTS prognostic halo update")
-         call mpas_timer_start("FB_LTS thickness halo update")
-         
+
          ! Don't need to update normalVelocityForTend, previously updated
+
+         call mpas_timer_start("FB_LTS thickness halo update")
          call mpas_dmpar_field_halo_exch(domain, 'layerThickness', timeLevel=5)
-         
          call mpas_timer_stop("FB_LTS thickness halo update")
+
          call mpas_timer_stop("FB_LTS prognostic halo update")
          
          ! Compute fast tendencies for normal velocity
@@ -1104,12 +1121,15 @@ module ocn_time_integration_fblts
          
          ! Halo update before tend calculation
          call mpas_timer_start("FB_LTS prognostic halo update")
-         call mpas_timer_start("FB_LTS thickness halo update")
-         
+
+         call mpas_timer_start("FB_LTS velocity halo update")
          call mpas_dmpar_field_halo_exch(domain, 'normalVelocity', timeLevel=5)
+         call mpas_timer_stop("FB_LTS velocity halo update")
+
+         call mpas_timer_start("FB_LTS thickness halo update")
          call mpas_dmpar_field_halo_exch(domain, 'layerThickness', timeLevel=5)
-         
          call mpas_timer_stop("FB_LTS thickness halo update")
+
          call mpas_timer_stop("FB_LTS prognostic halo update")
          
          ! Compute fast tendencies for thickness
@@ -1193,12 +1213,13 @@ module ocn_time_integration_fblts
 
          ! Halo update before tend calculation
          call mpas_timer_start("FB_LTS prognostic halo update")
-         call mpas_timer_start("FB_LTS thickness halo update")
          
          ! Don't need to update normalVelocityForTend, previously updated
+
+         call mpas_timer_start("FB_LTS thickness halo update")
          call mpas_dmpar_field_halo_exch(domain, 'layerThickness', timeLevel=5)
-         
          call mpas_timer_stop("FB_LTS thickness halo update")
+
          call mpas_timer_stop("FB_LTS prognostic halo update")
          
          ! Compute fast tendencies for normal velocity
