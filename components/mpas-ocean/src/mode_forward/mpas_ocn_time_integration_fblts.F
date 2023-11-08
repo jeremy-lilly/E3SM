@@ -915,11 +915,14 @@ module ocn_time_integration_fblts
 
          call mpas_timer_stop("FB_LTS compute fast velocity tendencies")
          call mpas_timer_stop("FB_LTS compute fast tendencies")
-
+   
          ! Advance normal velocity solution with first stage
          call mpas_timer_start("FB_LTS advance solution")
          call mpas_timer_start("FB_LTS advance velocity solution")
          
+         normalVelocityTend(:,:) = normalVelocityTend(:,:) &
+                                   + normalVelocityTendSlow(:,:)
+
          ! Fine cells adjacent to interface 1
          do ie = 1, nEdgesInLTSRegion(1,3)
             iEdge = edgesInLTSRegion(1,3,ie)
@@ -1070,6 +1073,9 @@ module ocn_time_integration_fblts
          ! Advance normal velocity solution with second stage
          call mpas_timer_start("FB_LTS advance solution")
          call mpas_timer_start("FB_LTS advance velocity solution")
+         
+         normalVelocityTend(:,:) = normalVelocityTend(:,:) &
+                                   + normalVelocityTendSlow(:,:)
          
          ! Fine cells adjacent to interface 1
          do ie = 1, nEdgesInLTSRegion(1,3)
@@ -1236,6 +1242,9 @@ module ocn_time_integration_fblts
          ! Advance normal velocity solution with third stage
          call mpas_timer_start("FB_LTS advance solution")
          call mpas_timer_start("FB_LTS advance velocity solution")
+         
+         normalVelocityTend(:,:) = normalVelocityTend(:,:) &
+                                   + normalVelocityTendSlow(:,:)
 
          ! Increment interface correction terms
          do iRegion = 1,nRegions
