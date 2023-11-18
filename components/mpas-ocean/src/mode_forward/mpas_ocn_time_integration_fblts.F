@@ -457,7 +457,7 @@ module ocn_time_integration_fblts
       ! FB-RK(3,2):
       ! h = weight1*stage1 + (1-weight1)*current
       layerThicknessForTend(:,:) = config_fb_weight_1 * layerThicknessFirstStage(:,:) &
-                                    + (1 - config_fb_weight_1) * layerThicknessCur(:,:)
+                                    + (1.0_RKIND - config_fb_weight_1) * layerThicknessCur(:,:)
       
       ! Halo update before tend calculation
       ! Might be able to remove this?
@@ -587,7 +587,7 @@ module ocn_time_integration_fblts
       ! FB-RK(3,2):
       ! h = weight2*stage2 + (1-weight2)*current
       layerThicknessForTend(:,:) = config_fb_weight_2 * layerThicknessSecondStage(:,:) &
-                                   + (1 - config_fb_weight_2) * layerThicknessCur(:,:)
+                                   + (1.0_RKIND - config_fb_weight_2) * layerThicknessCur(:,:)
       
       ! Halo update before tend calculation
       ! Might be able to remove this?
@@ -717,7 +717,7 @@ module ocn_time_integration_fblts
       ! FB-RK(3,2):
       ! h = weight3*new + (1-2*weight3)*secondStage + weight3*current
       layerThicknessForTend(:,:) = config_fb_weight_3 * layerThicknessNew(:,:) &
-                                   + (1 - 2*config_fb_weight_3) * layerThicknessSecondStage(:,:) &
+                                   + (1.0_RKIND - 2.0_RKIND*config_fb_weight_3) * layerThicknessSecondStage(:,:) &
                                    + config_fb_weight_3 * layerThicknessCur(:,:)
       
       ! Halo update before tend calculation
@@ -791,6 +791,7 @@ module ocn_time_integration_fblts
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       do im = 0, M-1
 
+
          !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
          ! BEGIN: Thickness stage 1
          ! Compute the first stage of the thickness on fine
@@ -803,15 +804,15 @@ module ocn_time_integration_fblts
          normalVelocityForTend(:,:) = normalVelocityCur(:,:)
          do ie = 1, nEdgesInLTSRegion(1,2)
             iEdge = edgesInLTSRegion(1,2,ie)
-            normalVelocityForTend(:,iEdge) = (im/M) * normalVelocityNew(:,iEdge) &
-                                             + (1 - (im/M)) * normalVelocityCur(:,iEdge)
+            normalVelocityForTend(:,iEdge) = (REAL(im)/M) * normalVelocityNew(:,iEdge) &
+                                             + (1.0_RKIND - REAL(im)/M) * normalVelocityCur(:,iEdge)
          end do
 
          layerThicknessForTend(:,:) = layerThicknessCur(:,:)
          do ic = 1, nCellsInLTSRegion(1,2)
             iCell = cellsInLTSRegion(1,2,ic)
-            layerThicknessForTend(:,iCell) = (im/M) * layerThicknessNew(:,iCell) &
-                                             + (1 - (im/M)) * layerThicknessCur(:,iCell)
+            layerThicknessForTend(:,iCell) = (REAL(im)/M) * layerThicknessNew(:,iCell) &
+                                             + (1.0_RKIND - REAL(im)/M) * layerThicknessCur(:,iCell)
          end do
 
          call mpas_timer_stop('FB_LTS interface prediction')
@@ -872,7 +873,7 @@ module ocn_time_integration_fblts
          ! FB-RK(3,2):
          ! h = weight1*stage1 + (1-weight1)*current
          layerThicknessForTend(:,:) = config_fb_weight_1 * layerThicknessFirstStage(:,:) &
-                                      + (1 - config_fb_weight_1) * layerThicknessCur(:,:)
+                                      + (1.0_RKIND - config_fb_weight_1) * layerThicknessCur(:,:)
 
          ! Calculate predicted FB averaged thickness data at 
          ! intermediate time-level on interface 1:
@@ -884,12 +885,12 @@ module ocn_time_integration_fblts
          do ic = 1, nCellsInLTSRegion(1,2)
             iCell = cellsInLTSRegion(1,2,ic)
             layerThicknessForTend(:,iCell) = config_fb_weight_1 &
-                                             * ( (im/M) * layerThicknessNew(:,iCell) &
-                                               + (1/M) * layerThicknessFirstStage(:,iCell) &
-                                               + (1 - ((im+1)/M)) * layerThicknessCur(:,iCell) ) &
-                                             + (1 - config_fb_weight_1) &
-                                             * ( (im/M) * layerThicknessNew(:,iCell) &
-                                               + (1 - (im/M)) * layerThicknessCur(:,iCell) )
+                                             * ( (REAL(im)/M) * layerThicknessNew(:,iCell) &
+                                               + (1.0_RKIND/M) * layerThicknessFirstStage(:,iCell) &
+                                               + (1.0_RKIND - (REAL(im)+1.0_RKIND)/M) * layerThicknessCur(:,iCell) ) &
+                                             + (1.0_RKIND - config_fb_weight_1) &
+                                             * ( (REAL(im)/M) * layerThicknessNew(:,iCell) &
+                                               + (1.0_RKIND - REAL(im)/M) * layerThicknessCur(:,iCell) )
          end do
          
          call mpas_timer_stop('FB_LTS interface prediction')
@@ -955,17 +956,17 @@ module ocn_time_integration_fblts
          normalVelocityForTend(:,:) = normalVelocityFirstStage(:,:)
          do ie = 1, nEdgesInLTSRegion(1,2)
             iEdge = edgesInLTSRegion(1,2,ie)
-            normalVelocityForTend(:,iEdge) = (im/M) * normalVelocityNew(:,iEdge) &
-                                             + (1/M) * normalVelocityFirstStage(:,iEdge) &
-                                             + (1 - ((im+1)/M)) * normalVelocityCur(:,iEdge)
+            normalVelocityForTend(:,iEdge) = (REAL(im)/M) * normalVelocityNew(:,iEdge) &
+                                             + (1.0_RKIND/M) * normalVelocityFirstStage(:,iEdge) &
+                                             + (1.0_RKIND - (REAL(im)+1.0_RKIND)/M) * normalVelocityCur(:,iEdge)
          end do
 
          layerThicknessForTend(:,:) = layerThicknessFirstStage(:,:)
          do ic = 1, nCellsInLTSRegion(1,2)
             iCell = cellsInLTSRegion(1,2,ic)
-            layerThicknessForTend(:,iCell) = (im/M) * layerThicknessNew(:,iCell) &
-                                             + (1/M) * layerThicknessFirstStage(:,iCell) &
-                                             + (1 - ((im+1)/M)) * layerThicknessCur(:,iCell)
+            layerThicknessForTend(:,iCell) = (REAL(im)/M) * layerThicknessNew(:,iCell) &
+                                             + (1.0_RKIND/M) * layerThicknessFirstStage(:,iCell) &
+                                             + (1.0_RKIND - (REAL(im)+1.0_RKIND)/M) * layerThicknessCur(:,iCell)
          end do
 
          call mpas_timer_stop('FB_LTS interface prediction')
@@ -1026,7 +1027,7 @@ module ocn_time_integration_fblts
          ! FB-RK(3,2):
          ! h = weight2*stage2 + (1-weight2)*current
          layerThicknessForTend(:,:) = config_fb_weight_2 * layerThicknessSecondStage(:,:) &
-                                      + (1 - config_fb_weight_2) * layerThicknessCur(:,:)
+                                      + (1.0_RKIND - config_fb_weight_2) * layerThicknessCur(:,:)
 
          ! Calculate predicted FB averaged thickness data at 
          ! intermediate time-level on interface 1:
@@ -1038,12 +1039,12 @@ module ocn_time_integration_fblts
          do ic = 1, nCellsInLTSRegion(1,2)
             iCell = cellsInLTSRegion(1,2,ic)
             layerThicknessForTend(:,iCell) = config_fb_weight_2 &
-                                             * ( (im/M) * layerThicknessNew(:,iCell) &
-                                               + (1/M) * layerThicknessSecondStage(:,iCell) &
-                                               + (1 - ((im+1)/M)) * layerThicknessCur(:,iCell) ) &
-                                             + (1 - config_fb_weight_2) &
-                                             * ( (im/M) * layerThicknessNew(:,iCell) &
-                                               + (1 - (im/M)) * layerThicknessCur(:,iCell) )
+                                             * ( (REAL(im)/M) * layerThicknessNew(:,iCell) &
+                                               + (1.0_RKIND/M) * layerThicknessSecondStage(:,iCell) &
+                                               + (1.0_RKIND - (REAL(im)+1.0_RKIND)/M) * layerThicknessCur(:,iCell) ) &
+                                             + (1.0_RKIND - config_fb_weight_2) &
+                                             * ( (REAL(im)/M) * layerThicknessNew(:,iCell) &
+                                               + (1.0_RKIND - REAL(im)/M) * layerThicknessCur(:,iCell) )
          end do
          
          call mpas_timer_stop('FB_LTS interface prediction')
@@ -1110,17 +1111,17 @@ module ocn_time_integration_fblts
          normalVelocityForTend(:,:) = normalVelocitySecondStage(:,:)
          do ie = 1, nEdgesInLTSRegion(1,2)
             iEdge = edgesInLTSRegion(1,2,ie)
-            normalVelocityForTend(:,iEdge) = (im/M) * normalVelocityNew(:,iEdge) &
-                                             + (1/M) * normalVelocitySecondStage(:,iEdge) &
-                                             + (1 - ((im+1)/M)) * normalVelocityCur(:,iEdge)
+            normalVelocityForTend(:,iEdge) = (REAL(im)/M) * normalVelocityNew(:,iEdge) &
+                                             + (1.0_RKIND/M) * normalVelocitySecondStage(:,iEdge) &
+                                             + (1.0_RKIND - (REAL(im)+1.0_RKIND)/M) * normalVelocityCur(:,iEdge)
          end do
 
          layerThicknessForTend(:,:) = layerThicknessSecondStage(:,:)
          do ic = 1, nCellsInLTSRegion(1,2)
             iCell = cellsInLTSRegion(1,2,ic)
-            layerThicknessForTend(:,iCell) = (im/M) * layerThicknessNew(:,iCell) &
-                                             + (1/M) * layerThicknessSecondStage(:,iCell) &
-                                             + (1 - ((im+1)/M)) * layerThicknessCur(:,iCell)
+            layerThicknessForTend(:,iCell) = (REAL(im)/M) * layerThicknessNew(:,iCell) &
+                                             + (1.0_RKIND/M) * layerThicknessSecondStage(:,iCell) &
+                                             + (1.0_RKIND - (REAL(im)+1.0_RKIND)/M) * layerThicknessCur(:,iCell)
          end do
 
          call mpas_timer_stop('FB_LTS interface prediction')
@@ -1190,7 +1191,7 @@ module ocn_time_integration_fblts
          ! FB-RK(3,2):
          ! h = weight3*new + (1-2*weight3)*stageTwo + weight3*current
          layerThicknessForTend(:,:) = config_fb_weight_3 * layerThicknessNew(:,:) &
-                                      + (1 - 2*config_fb_weight_3) * layerThicknessSecondStage(:,:) &
+                                      + (1.0_RKIND - 2.0_RKIND*config_fb_weight_3) * layerThicknessSecondStage(:,:) &
                                       + config_fb_weight_3 * layerThicknessCur(:,:)
 
          ! Calculate predicted FB averaged thickness data at 
@@ -1204,15 +1205,15 @@ module ocn_time_integration_fblts
          do ic = 1, nCellsInLTSRegion(1,2)
             iCell = cellsInLTSRegion(1,2,ic)
             layerThicknessForTend(:,iCell) = config_fb_weight_3 &
-                                             * ( ((im+1)/M) * layerThicknessNew(:,iCell) &
-                                               + (1 - ((im+1)/M)) * layerThicknessCur(:,iCell) ) &
-                                             + (1 - 2*config_fb_weight_3) &
-                                             * ( (im/M) * layerThicknessNew(:,iCell) &
-                                               + (1/M) * layerThicknessSecondStage(:,iCell) &
-                                               + (1 - ((im+1)/M)) * layerThicknessCur(:,iCell) ) &
+                                             * ( ((REAL(im)+1.0_RKIND)/M) * layerThicknessNew(:,iCell) &
+                                               + (1.0_RKIND - (REAL(im)+1.0_RKIND)/M) * layerThicknessCur(:,iCell) ) &
+                                             + (1.0_RKIND - 2.0_RKIND*config_fb_weight_3) &
+                                             * ( (REAL(im)/M) * layerThicknessNew(:,iCell) &
+                                               + (1.0_RKIND/M) * layerThicknessSecondStage(:,iCell) &
+                                               + (1.0_RKIND - (REAL(im)+1.0_RKIND)/M) * layerThicknessCur(:,iCell) ) &
                                              + config_fb_weight_3 &
-                                             * ( (im/M) * layerThicknessNew(:,iCell) &
-                                               + (1 - (im/M)) * layerThicknessCur(:,iCell) )
+                                             * ( (REAL(im)/M) * layerThicknessNew(:,iCell) &
+                                               + (1.0_RKIND - REAL(im)/M) * layerThicknessCur(:,iCell) )
          end do
          
          call mpas_timer_stop('FB_LTS interface prediction')
