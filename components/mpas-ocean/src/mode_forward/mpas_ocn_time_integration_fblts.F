@@ -36,7 +36,7 @@ module ocn_time_integration_fblts
    use ocn_mesh
    use ocn_vmix
    use ocn_config
-   !use ocn_diagnostics_variables
+   use ocn_diagnostics_variables
    use ocn_equation_of_state
    use ocn_time_average_coupled
    use ocn_time_varying_forcing
@@ -698,7 +698,7 @@ module ocn_time_integration_fblts
       do ic = 1, nCellsInLTSRegion(1,3)
          iCell = cellsInLTSRegion(1,3,ic)
          layerThicknessNew(:,iCell) = layerThicknessCur(:,iCell) &
-                                      +  dt * layerThicknessTend(:,iCell)
+                                      + dt * layerThicknessTend(:,iCell)
       end do
 
       call mpas_timer_stop("FB_LTS advance thickness solution")
@@ -750,13 +750,11 @@ module ocn_time_integration_fblts
       normalVelocityTend(:,:) = normalVelocityTend(:,:) &
                                 + normalVelocityTendSlow(:,:)
       
-      ! Interface regions
-      do iRegion = 1,nRegions
-         do ie = 1, nEdgesInLTSRegion(iRegion,2)
-            iEdge = edgesInLTSRegion(iRegion,2,ie)
-            normalVelocityNew(:,iEdge) = normalVelocityCur(:,iEdge) &
-                                         + dt * normalVelocityTend(:,iEdge)
-         end do
+      ! Interface 1
+      do ie = 1, nEdgesInLTSRegion(1,2)
+         iEdge = edgesInLTSRegion(1,2,ie)
+         normalVelocityNew(:,iEdge) = normalVelocityCur(:,iEdge) &
+                                      + dt * normalVelocityTend(:,iEdge)
       end do
       ! Coarse
       do ie = 1, nEdgesInLTSRegion(2,1)
@@ -1274,6 +1272,8 @@ module ocn_time_integration_fblts
          ! END: Normal velocity stage 3
          !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+         ! COPY NEW INTO CUR ON FINE
+
       end do
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! END FINE ADVANCEMENT
@@ -1308,8 +1308,9 @@ module ocn_time_integration_fblts
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! END INTERFACE CORRECTION
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
       
-      ! Final prognostic halo update 
+      ! Final prognostic halo update, is this needed? 
       call mpas_timer_start("FB_LTS prognostic halo update")
 
       call mpas_timer_start("FB_LTS velocity halo update")
@@ -1389,6 +1390,7 @@ module ocn_time_integration_fblts
          SSHGradient(indexSSHGradientMeridional, iCell) = gradSSHMeridional(iCell)
       end do
 
+      ! NEED TO GET CORRECT SSH AT TL==2!!????
       call ocn_time_average_coupled_accumulate(statePool, forcingPool, 2)
 
       do iCell = 1, nCellsAll
@@ -1624,7 +1626,7 @@ module ocn_time_integration_fblts
          computeOnInterfaceTwo, &
          computeOnCoarse
 
-      real (kind=RKIND), dimension(:,:), pointer :: &
+      real (kind=RKIND), dimension(:,:), pointer, intent(in) :: &
          layerThickness, &
          normalVelocity
 
@@ -1795,7 +1797,7 @@ module ocn_time_integration_fblts
          computeOnInterfaceTwo, &
          computeOnCoarse
 
-      real (kind=RKIND), dimension(:,:), pointer :: &
+      real (kind=RKIND), dimension(:,:), pointer, intent(in) :: &
          layerThickness, &
          normalVelocity
 
