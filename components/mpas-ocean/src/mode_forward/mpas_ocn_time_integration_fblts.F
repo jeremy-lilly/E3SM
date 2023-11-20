@@ -1321,7 +1321,29 @@ module ocn_time_integration_fblts
       call mpas_timer_stop("FB_LTS thickness halo update")
 
       call mpas_timer_stop("FB_LTS prognostic halo update")
-    
+
+      ! Implicit vmix, DO WE NEED THIS?
+      call mpas_timer_start("FB_LTS implicit vmix")
+      if (.not. config_disable_vel_vmix) then
+         call ocn_diagnostic_solve(dt, statePool, forcingPool, meshPool, &
+                                   verticalMeshPool, scratchPool, tracersPool, 2)
+         call ocn_vmix_implicit(dt, meshPool, statePool, forcingPool, scratchPool, err, 2)
+
+         ! Halo update
+         call mpas_timer_start("FB_LTS prognostic halo update")
+
+         call mpas_timer_start("FB_LTS velocity halo update")
+         call mpas_dmpar_field_halo_exch(domain, 'normalVelocity', timeLevel=2)
+         call mpas_timer_stop("FB_LTS velocity halo update")
+      
+         call mpas_timer_start("FB_LTS thickness halo update")
+         call mpas_dmpar_field_halo_exch(domain, 'layerThickness', timeLevel=2)
+         call mpas_timer_stop("FB_LTS thickness halo update")
+
+         call mpas_timer_stop("FB_LTS prognostic halo update")
+      end if   
+      call mpas_timer_stop("FB_LTS implicit vmix")
+
       call mpas_timer_stop("FB_LTS main loop")
       
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
