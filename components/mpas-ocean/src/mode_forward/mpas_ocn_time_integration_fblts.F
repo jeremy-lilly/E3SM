@@ -151,6 +151,10 @@ module ocn_time_integration_fblts
          layerThicknessSecondStage, &  ! layer thickness at second stage of LTS
          layerThicknessForTend  ! extra variable to store averages of data for tends calculations
       
+      ! Local pointer for ssh
+      real (kind=RKIND), dimension(:), pointer :: &
+         ssh
+
       ! LTS objects
       real (kind=RKIND) :: &
          dtFine, &  ! fine dt, defined as dt / M
@@ -1272,7 +1276,37 @@ module ocn_time_integration_fblts
          ! END: Normal velocity stage 3
          !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-         ! COPY NEW INTO CUR ON FINE
+         
+         ! Copy new solution into cur solution for use at the beginning
+         ! of the next substep
+         ! We might be able to speed this up by only doing a copy for
+         ! layer thickness and changing New to Cur in the above 
+         ! stage 3 step for the normal velocity
+         call mpas_timer_start("FB_LTS copy new soln into cur soln")
+         
+         ! Fine adjacent to interface 1
+         do ie = 1, nEdgesInLTSRegion(1,3)
+            iEdge = edgesInLTSRegion(1,3,ie)
+            normalVelocityCur(:,iEdge) = normalVelocityNew(:,iEdge)
+         end do
+         ! Fine in the interior, away from interface 1
+         do ie = 1, nEdgesInLTSRegion(1,1)
+            iEdge = edgesInLTSRegion(1,1,ie)
+            normalVelocityCur(:,iEdge) = normalVelocityNew(:,iEdge)
+         end do
+
+         ! Fine adjacent to interface 1
+         do ic = 1, nCellsInLTSRegion(1,3)
+            iCell = cellsInLTSRegion(1,3,ic)
+            layerThicknessCur(:,iCell) = layerThicknessNew(:,iCell)
+         end do
+         ! Fine in the interior, away from interface 1
+         do ic = 1, nCellsInLTSRegion(1,1)
+            iCell = cellsInLTSRegion(1,1,ic)
+            layerThicknessCur(:,iCell) = layerThicknessNew(:,iCell)
+         end do
+
+         call mpas_timer_stop("FB_LTS copy new soln into cur soln")
 
       end do
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1372,6 +1406,20 @@ module ocn_time_integration_fblts
          normalTransportVelocity(:,iEdge) = normalVelocityNew(:,iEdge)
       end do
 
+      ! Calculate ssh at new time level (2) before computing the diagnostics
+      ! It seems like we need this, as the call to ocn_diagnostic_solve
+      ! looks for ssh at time level 2 without calculating it itself
+      call mpas_pool_get_array(statePool, 'ssh', ssh, 2)
+      do iCell = 1, nCellsAll
+         k = maxLevelCell(iCell)
+         zTop(k:nVertLevels,iCell) = -bottomDepth(iCell) + layerThicknessNew(k,iCell)
+         do k = maxLevelCell(iCell)-1, minLevelCell(iCell), -1
+            zTop(k,iCell) = zTop(k+1,iCell) + layerThicknessNew(k,iCell)
+         end do
+         ! copy zTop(1,iCell) into sea-surface height array
+         ssh(iCell) = zTop(minLevelCell(iCell),iCell)
+      end do
+
       call mpas_reconstruct(meshPool, normalVelocityNew, &
                             velocityX, velocityY, velocityZ, &
                             velocityZonal, velocityMeridional, &
@@ -1390,7 +1438,6 @@ module ocn_time_integration_fblts
          SSHGradient(indexSSHGradientMeridional, iCell) = gradSSHMeridional(iCell)
       end do
 
-      ! NEED TO GET CORRECT SSH AT TL==2!!????
       call ocn_time_average_coupled_accumulate(statePool, forcingPool, 2)
 
       do iCell = 1, nCellsAll
@@ -1400,7 +1447,6 @@ module ocn_time_integration_fblts
          SSHGradient(indexSSHGradientZonal, iCell) = gradSSHZonal(iCell)
          SSHGradient(indexSSHGradientMeridional, iCell) = gradSSHMeridional(iCell)
       end do
-
 
       ! Update diagnostics
       call ocn_diagnostic_solve(dt, statePool, forcingPool, meshPool, &
