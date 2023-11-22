@@ -21,25 +21,18 @@
 
 module ocn_time_integration_fblts
        
-   use mpas_derived_types
    use mpas_pool_routines
-   use mpas_constants
    use mpas_dmpar
    use mpas_threading
    use mpas_vector_reconstruction
-   use mpas_spline_interpolation
    use mpas_timer
 
-   use ocn_constants
    use ocn_tendency
    use ocn_diagnostics
    use ocn_mesh
    use ocn_vmix
    use ocn_config
-   use ocn_diagnostics_variables
-   use ocn_equation_of_state
    use ocn_time_average_coupled
-   use ocn_time_varying_forcing
 
    implicit none
    private
