@@ -11,9 +11,9 @@
 !
 !> \brief  MPAS barotropic ocean LTS Time integration scheme
 !> \author Jeremy Lilly
-!> \date   November 2022
+!> \date   October 2023
 !> \details
-!>  This module contains the LTS init routine and the LTS
+!>  This module contains the FB_LTS init routine and the FB_LTS
 !>  barotropic ocean time integration scheme with splitting
 !>  on the fast and slow tendency terms.
 !
@@ -72,7 +72,7 @@ module ocn_time_integration_fblts
    subroutine ocn_time_integrator_fblts(domain, dt)!{{{
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! Advance model state forward in time by the specified time step 
-   ! using a local time stepping scheme with spltting of the fast and 
+   ! using a local time stepping scheme with splitting of the fast and 
    ! slow tendencies
    !
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -118,12 +118,8 @@ module ocn_time_integration_fblts
       type (mpas_pool_type), pointer :: &
          LTSPool, &  ! structure holding LTS variables
          tendSlowPool, &  ! structure holding the slow tendency variables
-         tendSum1stPool, &  ! structure holding one of the correction terms for the interface
-         tendSum2ndPool, &  ! structure holding one of the correction terms for the interface
          tendSum3rdPool, &  ! structure holding one of the correction terms for the interface
          prevTendSlowPool, nextTendSlowPool, &  ! structures containing intermediate data
-         prevTendSum1stPool, nextTendSum1stPool, &  ! structures containing intermediate data
-         prevTendSum2ndPool, nextTendSum2ndPool, &  ! structures containing intermediate data
          prevTendSum3rdPool, nextTendSum3rdPool  ! structures containing intermediate data
 
       ! Tend Array Pointers
@@ -131,10 +127,6 @@ module ocn_time_integration_fblts
          normalVelocityTend, &  ! normal velocity fast tendency
          layerThicknessTend, &  ! layer thickness tendency
          normalVelocityTendSlow, &  ! normal velocity slow tendency
-         normalVelocityTendSum1st, &  ! one of the normal velocity correction terms for the interface
-         layerThicknessTendSum1st, &  ! one of the layer thickness correction terms for the interface
-         normalVelocityTendSum2nd, &  ! one of the normal velocity correction terms for the interface
-         layerThicknessTendSum2nd, &  ! one of the layer thickness correction terms for the interface
          normalVelocityTendSum3rd, &  ! one of the normal velocity correction terms for the interface
          layerThicknessTendSum3rd   ! one of the layer thickness correction terms for the interface
 
@@ -157,8 +149,7 @@ module ocn_time_integration_fblts
 
       ! LTS objects
       real (kind=RKIND) :: &
-         dtFine, &  ! fine dt, defined as dt / M
-         alpha, alphaHat, beta, betaHat, gam, gamHat  ! interpolation coefficients for the predictor step of LTS
+         dtFine  ! fine dt, defined as dt / M
       integer, dimension(:,:), pointer :: &
          nCellsInLTSRegion, &  ! number of cells in a given LTS region
          nEdgesInLTSRegion  ! number of edges in a given LTS region
@@ -166,9 +157,9 @@ module ocn_time_integration_fblts
          cellsInLTSRegion, &  ! list of cells in a given LTS region
          edgesInLTSRegion  ! list of edges in a given LTS region
       real (kind=RKIND) :: &
-         weight1st, weight2nd, weight3rd  ! coefficents each RK stage
+         weight1st, weight2nd  ! coefficients for each RK stage
       real (kind=RKIND) :: &
-         weightTendSum1st, weightTendSum2nd, weightTendSum3rd  ! coefficients for the interface correction
+         weightTendSum3rd  ! coefficients for the interface correction
 
       integer err 
       err = 0
@@ -191,10 +182,9 @@ module ocn_time_integration_fblts
       nRegions = 2
       dtFine = dt / M
       
-      ! Weights for RK stages
+      ! Weights for RK stages, weight for third stage is 1
       weight1st = 1.0_RKIND / 3.0_RKIND
       weight2nd = 1.0_RKIND / 2.0_RKIND
-      weight3rd = 1.0_RKIND
       
       block => domain % blocklist
 
@@ -241,38 +231,20 @@ module ocn_time_integration_fblts
       call mpas_pool_get_array(LTSPool, 'nEdgesInLTSRegion', nEdgesInLTSRegion)
       
       ! Create and retrieve additional pools for LTS
-      !call mpas_pool_create_pool(tendSum1stPool)
-      !call mpas_pool_clone_pool(tendPool, tendSum1stPool, 1)
-      !call mpas_pool_create_pool(tendSum2ndPool)
-      !call mpas_pool_clone_pool(tendPool, tendSum2ndPool, 1)
       call mpas_pool_create_pool(tendSum3rdPool)
       call mpas_pool_clone_pool(tendPool, tendSum3rdPool, 1)
       call mpas_pool_create_pool(tendSlowPool)
       call mpas_pool_clone_pool(tendPool, tendSlowPool, 1)
 
-      !call mpas_pool_add_subpool(block % structs, 'tend_sum_1st', tendSum1stPool)
-      !call mpas_pool_add_subpool(block % structs, 'tend_sum_2nd', tendSum2ndPool)
       call mpas_pool_add_subpool(block % structs, 'tend_sum_3rd', tendSum3rdPool)
       call mpas_pool_add_subpool(block % structs, 'tend_slow', tendSlowPool)
 
       call mpas_pool_get_array(tendSlowPool, 'normalVelocity', &
                                               normalVelocityTendSlow)
-      !call mpas_pool_get_array(tendSum1stPool, 'normalVelocity', &
-      !                                          normalVelocityTendSum1st)
-      !call mpas_pool_get_array(tendSum1stPool, 'layerThickness', &
-      !                                          layerThicknessTendSum1st)
-      !call mpas_pool_get_array(tendSum2ndPool, 'normalVelocity', &
-      !                                          normalVelocityTendSum2nd)
-      !call mpas_pool_get_array(tendSum2ndPool, 'layerThickness', &
-      !                                          layerThicknessTendSum2nd)
       call mpas_pool_get_array(tendSum3rdPool, 'normalVelocity', &
                                                 normalVelocityTendSum3rd)
       call mpas_pool_get_array(tendSum3rdPool, 'layerThickness', &
                                                 layerThicknessTendSum3rd)
-      
-      ! not sure if we need this yet -- also need to dealloc if used!
-      !allocate(normalVelocityForTend(nVertLevels,nEdgesAll))
-      !allocate(layerThicknessForTend(nVertLevels,nCellsAll))
       
       ! Init variables
       do iEdge = 1, nEdgesAll  ! do we need this?
@@ -291,64 +263,28 @@ module ocn_time_integration_fblts
          end do
       end do
 
-      !normalVelocityTendSum1st(:,:) = 0.0_RKIND
-      !layerThicknessTendSum1st(:,:) = 0.0_RKIND
-
-      !normalVelocityTendSum2nd(:,:) = 0.0_RKIND
-      !layerThicknessTendSum2nd(:,:) = 0.0_RKIND
-
       normalVelocityTendSum3rd(:,:) = 0.0_RKIND
       layerThicknessTendSum3rd(:,:) = 0.0_RKIND
       
       if (associated(block % prev)) then
-         !call mpas_pool_get_subpool(block % prev % structs, 'tend_sum_1st', tendSum1stPool)
-         !call mpas_pool_get_subpool(block % prev % structs, 'tend_sum_2nd', tendSum2ndPool)
          call mpas_pool_get_subpool(block % prev % structs, 'tend_sum_3rd', tendSum3rdPool)
          call mpas_pool_get_subpool(block % prev % structs, 'tend_slow', tendSlowPool)
       else
-         !nullify(prevTendSum1stPool)
-         !nullify(prevTendSum2ndPool)
          nullify(prevTendSum3rdPool)
          nullify(prevTendSlowPool)
       end if
 
       if (associated(block % next)) then
-         !call mpas_pool_get_subpool(block % next % structs, 'tend_sum_1st', nextTendSum1stPool)
-         !call mpas_pool_get_subpool(block % next % structs, 'tend_sum_2nd', nextTendSum2ndPool)
          call mpas_pool_get_subpool(block % next % structs, 'tend_sum_3rd', nextTendSum3rdPool)
          call mpas_pool_get_subpool(block % next % structs, 'tend_slow', nextTendSlowPool)
       else
-         !nullify(nextTendSum1stPool)
-         !nullify(nextTendSum2ndPool)
          nullify(nextTendSum3rdPool)
          nullify(nextTendSlowPool)
       end if
 
-      !call mpas_pool_get_subpool(block % structs, 'tend_sum_1st', tendSum1stPool)
-      !call mpas_pool_get_subpool(block % structs, 'tend_sum_2nd', tendSum2ndPool)
       call mpas_pool_get_subpool(block % structs, 'tend_sum_3rd', tendSum3rdPool)
       call mpas_pool_get_subpool(block % structs, 'tend_slow', tendSlowPool)
    
-      !if (associated(prevTendSum1stPool) .and. associated(nextTendSum1stPool)) then
-      !   call mpas_pool_link_pools(tendSum1stPool, prevTendSum1stPool, nextTendSum1stPool)
-      !else if (associated(prevTendSum1stPool)) then
-      !   call mpas_pool_link_pools(tendSum1stPool, prevTendSum1stPool)
-      !else if (associated(nextTendSum1stPool)) then
-      !   call mpas_pool_link_pools(tendSum1stPool,nextPool=nextTendSum1stPool)
-      !else
-      !   call mpas_pool_link_pools(tendSum1stPool)
-      !end if
-
-      !if (associated(prevTendSum2ndPool) .and. associated(nextTendSum2ndPool)) then
-      !   call mpas_pool_link_pools(tendSum2ndPool, prevTendSum2ndPool, nextTendSum2ndPool)
-      !else if (associated(prevTendSum2ndPool)) then
-      !   call mpas_pool_link_pools(tendSum2ndPool, prevTendSum2ndPool)
-      !else if (associated(nextTendSum2ndPool)) then
-      !   call mpas_pool_link_pools(tendSum2ndPool,nextPool=nextTendSum2ndPool)
-      !else
-      !   call mpas_pool_link_pools(tendSum2ndPool)
-      !end if
-
       if (associated(prevTendSum3rdPool) .and. associated(nextTendSum3rdPool)) then
          call mpas_pool_link_pools(tendSum3rdPool, prevTendSum3rdPool, nextTendSum3rdPool)
       else if (associated(prevTendSum3rdPool)) then
@@ -369,8 +305,6 @@ module ocn_time_integration_fblts
          call mpas_pool_link_pools(tendSlowPool)
       end if
 
-      !call mpas_pool_link_parinfo(block, tendSum1stPool)
-      !call mpas_pool_link_parinfo(block, tendSum2ndPool)
       call mpas_pool_link_parinfo(block, tendSum3rdPool)
       call mpas_pool_link_parinfo(block, tendSlowPool)
 
@@ -483,6 +417,9 @@ module ocn_time_integration_fblts
                             normalVelocityCur, layerThicknessForTend, &
                             0, 1, 1, 1, 1)
 
+      normalVelocityTend(:,:) = normalVelocityTend(:,:) &
+                                + normalVelocityTendSlow(:,:)
+
       call mpas_timer_stop("FB_LTS compute fast velocity tendencies")
       call mpas_timer_stop("FB_LTS compute fast tendencies")
 
@@ -490,9 +427,6 @@ module ocn_time_integration_fblts
       call mpas_timer_start("FB_LTS advance solution")
       call mpas_timer_start("FB_LTS advance velocity solution")
 
-      normalVelocityTend(:,:) = normalVelocityTend(:,:) &
-                                + normalVelocityTendSlow(:,:)
-      
       ! Interface regions
       do iRegion = 1,nRegions
          do ie = 1, nEdgesInLTSRegion(iRegion,2)
@@ -613,15 +547,15 @@ module ocn_time_integration_fblts
                             normalVelocityFirstStage, layerThicknessForTend, &
                             0, 1, 1, 1, 1)
 
+      normalVelocityTend(:,:) = normalVelocityTend(:,:) &
+                                + normalVelocityTendSlow(:,:)
+
       call mpas_timer_stop("FB_LTS compute fast velocity tendencies")
       call mpas_timer_stop("FB_LTS compute fast tendencies")
 
       ! Advance normal velocity solution with first stage
       call mpas_timer_start("FB_LTS advance solution")
       call mpas_timer_start("FB_LTS advance velocity solution")
-
-      normalVelocityTend(:,:) = normalVelocityTend(:,:) &
-                                + normalVelocityTendSlow(:,:)
       
       ! Interface regions
       do iRegion = 1,nRegions
@@ -744,15 +678,15 @@ module ocn_time_integration_fblts
                             normalVelocitySecondStage, layerThicknessForTend, &
                             0, 0, 1, 0, 1)
 
+      normalVelocityTend(:,:) = normalVelocityTend(:,:) &
+                                + normalVelocityTendSlow(:,:)
+
       call mpas_timer_stop("FB_LTS compute fast velocity tendencies")
       call mpas_timer_stop("FB_LTS compute fast tendencies")
 
       ! Advance normal velocity solution with first stage
       call mpas_timer_start("FB_LTS advance solution")
       call mpas_timer_start("FB_LTS advance velocity solution")
-
-      normalVelocityTend(:,:) = normalVelocityTend(:,:) &
-                                + normalVelocityTendSlow(:,:)
       
       ! Interface 1
       do ie = 1, nEdgesInLTSRegion(1,2)
@@ -916,15 +850,15 @@ module ocn_time_integration_fblts
                                normalVelocityForTend, layerThicknessForTend, &
                                1, 1, 0, 0, 0)
 
+         normalVelocityTend(:,:) = normalVelocityTend(:,:) &
+                                   + normalVelocityTendSlow(:,:)
+
          call mpas_timer_stop("FB_LTS compute fast velocity tendencies")
          call mpas_timer_stop("FB_LTS compute fast tendencies")
    
          ! Advance normal velocity solution with first stage
          call mpas_timer_start("FB_LTS advance solution")
          call mpas_timer_start("FB_LTS advance velocity solution")
-         
-         normalVelocityTend(:,:) = normalVelocityTend(:,:) &
-                                   + normalVelocityTendSlow(:,:)
 
          ! Fine cells adjacent to interface 1
          do ie = 1, nEdgesInLTSRegion(1,3)
@@ -1070,15 +1004,15 @@ module ocn_time_integration_fblts
                                normalVelocityForTend, layerThicknessForTend, &
                                1, 1, 0, 0, 0)
 
+         normalVelocityTend(:,:) = normalVelocityTend(:,:) &
+                                   + normalVelocityTendSlow(:,:)
+
          call mpas_timer_stop("FB_LTS compute fast velocity tendencies")
          call mpas_timer_stop("FB_LTS compute fast tendencies")
 
          ! Advance normal velocity solution with second stage
          call mpas_timer_start("FB_LTS advance solution")
          call mpas_timer_start("FB_LTS advance velocity solution")
-         
-         normalVelocityTend(:,:) = normalVelocityTend(:,:) &
-                                   + normalVelocityTendSlow(:,:)
          
          ! Fine cells adjacent to interface 1
          do ie = 1, nEdgesInLTSRegion(1,3)
@@ -1239,6 +1173,9 @@ module ocn_time_integration_fblts
                                normalVelocityForTend, layerThicknessForTend, &
                                1, 1, 1, 1, 0)
 
+         normalVelocityTend(:,:) = normalVelocityTend(:,:) &
+                                   + normalVelocityTendSlow(:,:)
+
          call mpas_timer_stop("FB_LTS compute fast velocity tendencies")
          call mpas_timer_stop("FB_LTS compute fast tendencies")
 
@@ -1246,9 +1183,6 @@ module ocn_time_integration_fblts
          call mpas_timer_start("FB_LTS advance solution")
          call mpas_timer_start("FB_LTS advance velocity solution")
          
-         normalVelocityTend(:,:) = normalVelocityTend(:,:) &
-                                   + normalVelocityTendSlow(:,:)
-
          ! Increment interface correction terms
          do iRegion = 1,nRegions
             do ie = 1, nEdgesInLTSRegion(iRegion,2)
@@ -1452,13 +1386,9 @@ module ocn_time_integration_fblts
       call ocn_diagnostic_solve(dt, statePool, forcingPool, meshPool, &
                                 verticalMeshPool, scratchPool, tracersPool, 2)
 
-      !call mpas_pool_destroy_pool(tendSum1stPool)
-      !call mpas_pool_destroy_pool(tendSum2ndPool)
       call mpas_pool_destroy_pool(tendSum3rdPool)
       call mpas_pool_destroy_pool(tendSlowPool)
 
-      !call mpas_pool_remove_subpool(block % structs, 'tend_sum_1st')
-      !call mpas_pool_remove_subpool(block % structs, 'tend_sum_2nd')
       call mpas_pool_remove_subpool(block % structs, 'tend_sum_3rd')
       call mpas_pool_remove_subpool(block % structs, 'tend_slow')
 
@@ -1473,7 +1403,7 @@ module ocn_time_integration_fblts
 !
 !> \brief  Initialization for MPAS ocean FB_LTS time integration scheme
 !> \author Giacomo Capodaglio
-!> \date   October 2023
+!> \date   November 2022
 !> \details
 !>  This routine computes the LTS arrays
 !
@@ -1651,7 +1581,8 @@ module ocn_time_integration_fblts
 !> \author Jeremy Lilly
 !> \date   October 2023 
 !> \details
-!>  This routine calculates the tendencies on different LTS regions
+!>  This routine calculates the thickness tendency on different 
+!>  LTS regions
 !
 !-----------------------------------------------------------------------
 
@@ -1822,7 +1753,8 @@ module ocn_time_integration_fblts
 !> \author Jeremy Lilly
 !> \date   October 2023 
 !> \details
-!>  This routine calculates the tendencies on different LTS regions
+!>  This routine calculates the velocity tendency on different 
+!>  LTS regions
 !
 !-----------------------------------------------------------------------
 
@@ -1890,9 +1822,6 @@ module ocn_time_integration_fblts
       call mpas_pool_get_array(LTSPool, 'nEdgesInLTSRegion', nEdgesInLTSRegion)
 
       call mpas_pool_get_array(tendPool, 'normalVelocity', normalVelocityTend)
-
-      !call mpas_pool_get_array(statePool, 'ssh', &
-      !                         ssh, timeLevelVelocity)
 
       if (config_use_self_attraction_loading) then
          ssh_sal_on = 1.0_RKIND
