@@ -697,16 +697,6 @@ module ocn_time_integration_fblts
       call mpas_timer_stop("FB_LTS advance velocity solution")
       call mpas_timer_stop("FB_LTS advance solution")
 
-      ! Halo update
-      ! Might be able to remove this?
-      call mpas_timer_start("FB_LTS prognostic halo update")
-
-      call mpas_timer_start("FB_LTS velocity halo update")
-      call mpas_dmpar_field_halo_exch(domain, 'normalVelocity', timeLevel=2)
-      call mpas_timer_stop("FB_LTS velocity halo update")
-
-      call mpas_timer_stop("FB_LTS prognostic halo update")
-
       ! END: Normal velocity stage 3
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       
