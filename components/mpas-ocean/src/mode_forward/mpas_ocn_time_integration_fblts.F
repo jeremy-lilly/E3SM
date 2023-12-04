@@ -1323,20 +1323,6 @@ module ocn_time_integration_fblts
          normalTransportVelocity(:,iEdge) = normalVelocityNew(:,iEdge)
       end do
 
-      ! Calculate ssh at new time level (2) before computing the diagnostics
-      ! It seems like we need this, as the call to ocn_diagnostic_solve
-      ! looks for ssh at time level 2 without calculating it itself
-      call mpas_pool_get_array(statePool, 'ssh', ssh, 2)
-      do iCell = 1, nCellsAll
-         k = maxLevelCell(iCell)
-         zTop(k:nVertLevels,iCell) = -bottomDepth(iCell) + layerThicknessNew(k,iCell)
-         do k = maxLevelCell(iCell)-1, minLevelCell(iCell), -1
-            zTop(k,iCell) = zTop(k+1,iCell) + layerThicknessNew(k,iCell)
-         end do
-         ! copy zTop(1,iCell) into sea-surface height array
-         ssh(iCell) = zTop(minLevelCell(iCell),iCell)
-      end do
-
       call mpas_reconstruct(meshPool, normalVelocityNew, &
                             velocityX, velocityY, velocityZ, &
                             velocityZonal, velocityMeridional, &
