@@ -1627,24 +1627,57 @@ module ocn_time_integration_fblts
       call mpas_pool_get_array(tendPool, 'layerThickness', layerThicknessTend)
 
       ! calculate layerThickEdgeFlux
-      ! add upwind formulation, ask Giacomo about branch
-      do iEdge = 1, nEdgesAll
-         kmin = minLevelEdgeBot(iEdge)
-         kmax = maxLevelEdgeTop(iEdge)
-         cell1 = cellsOnEdge(1,iEdge)
-         cell2 = cellsOnEdge(2,iEdge)
-         do k = 1,nVertLevels
-            ! initialize layerThicknessEdgeMean to avoid divide by
-            ! zero and NaN problems.
-            layerThickEdgeFlux(k,iEdge) = -1.0e34_RKIND
+      if (config_thickness_flux_type == 'centered') then
+
+         do iEdge = 1, nEdgesAll
+            kmin = minLevelEdgeBot(iEdge)
+            kmax = maxLevelEdgeTop(iEdge)
+            cell1 = cellsOnEdge(1,iEdge)
+            cell2 = cellsOnEdge(2,iEdge)
+            do k = 1,nVertLevels
+               ! initialize layerThicknessEdgeMean to avoid divide by
+               ! zero and NaN problems.
+               layerThickEdgeFlux(k,iEdge) = -1.0e34_RKIND
+            end do
+            do k = kmin,kmax
+               ! central differenced
+               layerThickEdgeFlux(k,iEdge) = 0.5_RKIND * &
+                                             ( layerThickness(k,cell1) + &
+                                             layerThickness(k,cell2) )
+            end do
          end do
-         do k = kmin,kmax
-            ! central differenced
-            layerThickEdgeFlux(k,iEdge) = 0.5_RKIND * &
-                                          ( layerThickness(k,cell1) &
-                                          + layerThickness(k,cell2) )
+
+      else if (config_thickness_flux_type == 'upwind') then
+
+         do iEdge = 1, nEdgesAll
+            kmin = minLevelEdgeBot(iEdge)
+            kmax = maxLevelEdgeTop(iEdge)
+            cell1 = cellsOnEdge(1,iEdge)
+            cell2 = cellsOnEdge(2,iEdge)
+            do k=1,nVertLevels
+               ! initialize layerThicknessEdgeFlux to avoid divide by
+               ! zero and NaN problems.
+               layerThickEdgeFlux(k,iEdge) = -1.0e34_RKIND
+            end do
+            do k = kmin,kmax
+               if (normalVelocity(k,iEdge) > 0.0_RKIND) then
+                  layerThickEdgeFlux(k,iEdge) = layerThickness(k,cell1)
+               elseif (normalVelocity(k,iEdge) < 0.0_RKIND) then
+                  layerThickEdgeFlux(k,iEdge) = layerThickness(k,cell2)
+               else
+                  layerThickEdgeFlux(k,iEdge) = max(layerThickness(k,cell1), &
+                                                    layerThickness(k,cell2))
+               end if
+            end do
          end do
-      end do
+
+      else
+
+         call mpas_log_write('ERROR: config_thickness_flux_type selected not implemented for LTS', &
+                             messageType=MPAS_LOG_CRIT)
+         call abort
+
+      end if
    
       layerThicknessTend(:, :) = 0.0_RKIND
 
