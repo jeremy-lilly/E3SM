@@ -1673,7 +1673,7 @@ module ocn_time_integration_fblts
 
       else
 
-         call mpas_log_write('ERROR: config_thickness_flux_type selected not implemented for LTS', &
+         call mpas_log_write('ERROR: config_thickness_flux_type selected not implemented for FB_LTS', &
                              messageType=MPAS_LOG_CRIT)
          call abort
 
@@ -1824,7 +1824,7 @@ module ocn_time_integration_fblts
          ic, i, iCell, kmin, kmax
 
       real (kind=RKIND) :: &
-         invdcEdge, betaSelfAttrLoad, flux, ssh_sal_on
+         invdcEdge, betaSelfAttrLoad, flux, ssh_sal_on, tidal_pot_for_on
       
       !-----------------------------------------------------------------
       ! Begin routine
@@ -1842,6 +1842,11 @@ module ocn_time_integration_fblts
       else
          ssh_sal_on = 0.0_RKIND
       endif
+      if (config_use_tidal_potential_forcing) then
+         tidal_pot_for_on = 1.0_RKIND
+      else
+         tidal_pot_for_on = 0.0_RKIND
+      end if
       
       ! ssh
       do iCell = 1, nCellsAll
@@ -1869,8 +1874,8 @@ module ocn_time_integration_fblts
                normalVelocityTend(k,iEdge) = normalVelocityTend(k,iEdge) &
                                              - edgeMask(k,iEdge) * invdcEdge &
                                              * ( gravity * ( (ssh(cell2) - ssh(cell1)) &
-                                             - (1.0_RKIND - ssh_sal_on) * betaSelfAttrLoad &
-                                             * (ssh(cell2) - ssh(cell1)) ) )
+                                             - tidal_pot_for_on * (1.0_RKIND - ssh_sal_on) &
+                                             * betaSelfAttrLoad * (ssh(cell2) - ssh(cell1)) ) )
             end do
          end do
       end if
@@ -1888,8 +1893,8 @@ module ocn_time_integration_fblts
                normalVelocityTend(k,iEdge) = normalVelocityTend(k,iEdge) &
                                              - edgeMask(k,iEdge) * invdcEdge &
                                              * ( gravity * ( (ssh(cell2) - ssh(cell1)) &
-                                             - (1.0_RKIND - ssh_sal_on) * betaSelfAttrLoad &
-                                             * (ssh(cell2) - ssh(cell1)) ) )
+                                             - tidal_pot_for_on * (1.0_RKIND - ssh_sal_on) &
+                                             * betaSelfAttrLoad * (ssh(cell2) - ssh(cell1)) ) )
             end do
          end do
       end if
@@ -1907,8 +1912,8 @@ module ocn_time_integration_fblts
                normalVelocityTend(k,iEdge) = normalVelocityTend(k,iEdge) &
                                              - edgeMask(k,iEdge) * invdcEdge &
                                              * ( gravity * ( (ssh(cell2) - ssh(cell1)) &
-                                             - (1.0_RKIND - ssh_sal_on) * betaSelfAttrLoad &
-                                             * (ssh(cell2) - ssh(cell1)) ) )
+                                             - tidal_pot_for_on * (1.0_RKIND - ssh_sal_on) &
+                                             * betaSelfAttrLoad * (ssh(cell2) - ssh(cell1)) ) )
             end do
          end do
       end if
@@ -1926,8 +1931,8 @@ module ocn_time_integration_fblts
                normalVelocityTend(k,iEdge) = normalVelocityTend(k,iEdge) &
                                              - edgeMask(k,iEdge) * invdcEdge &
                                              * ( gravity * ( (ssh(cell2) - ssh(cell1)) &
-                                             - (1.0_RKIND - ssh_sal_on) * betaSelfAttrLoad &
-                                             * (ssh(cell2) - ssh(cell1)) ) )
+                                             - tidal_pot_for_on * (1.0_RKIND - ssh_sal_on) &
+                                             * betaSelfAttrLoad * (ssh(cell2) - ssh(cell1)) ) )
             end do
          end do
       end if
@@ -1945,8 +1950,8 @@ module ocn_time_integration_fblts
                normalVelocityTend(k,iEdge) = normalVelocityTend(k,iEdge) &
                                              - edgeMask(k,iEdge) * invdcEdge &
                                              * ( gravity * ( (ssh(cell2) - ssh(cell1)) &
-                                             - (1.0_RKIND - ssh_sal_on) * betaSelfAttrLoad &
-                                             * (ssh(cell2) - ssh(cell1)) ) )
+                                             - tidal_pot_for_on * (1.0_RKIND - ssh_sal_on) & 
+                                             * betaSelfAttrLoad * (ssh(cell2) - ssh(cell1)) ) )
             end do
          end do
       end if
