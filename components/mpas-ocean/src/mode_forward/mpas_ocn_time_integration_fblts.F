@@ -1163,6 +1163,10 @@ module ocn_time_integration_fblts
          call mpas_timer_stop("FB_LTS compute fast tendencies")
 
          ! Advance normal velocity solution with third stage
+         ! Here, we write into normalVelocityCur, rather than
+         ! normalVelocityNew, so that the New data is stored
+         ! in normalVelocityCur to be used at the beginning of the
+         ! next subcycled time-step
          call mpas_timer_start("FB_LTS advance solution")
          call mpas_timer_start("FB_LTS advance velocity solution")
          
@@ -1177,13 +1181,13 @@ module ocn_time_integration_fblts
          ! Fine cells adjacent to interface 1
          do ie = 1, nEdgesInLTSRegion(1,3)
             iEdge = edgesInLTSRegion(1,3,ie)
-            normalVelocityNew(:,iEdge) = normalVelocityCur(:,iEdge) &
+            normalVelocityCur(:,iEdge) = normalVelocityCur(:,iEdge) &
                                          + dtFine * normalVelocityTend(:,iEdge)
          end do
          ! Fine in the interior, away from interface 1
          do ie = 1, nEdgesInLTSRegion(1,1)
             iEdge = edgesInLTSRegion(1,1,ie)
-            normalVelocityNew(:,iEdge) = normalVelocityCur(:,iEdge) &
+            normalVelocityCur(:,iEdge) = normalVelocityCur(:,iEdge) &
                                          + dtFine * normalVelocityTend(:,iEdge)
          end do
          
@@ -1196,22 +1200,11 @@ module ocn_time_integration_fblts
          
          ! Copy new solution into cur solution for use at the beginning
          ! of the next substep
-         ! We might be able to speed this up by only doing a copy for
-         ! layer thickness and changing New to Cur in the above 
-         ! stage 3 step for the normal velocity
-         call mpas_timer_start("FB_LTS copy new soln into cur soln")
+         ! We only do this for layerThickness here because we write 
+         ! into normalVelocityCur rather than normalVelocityNew above
+         ! for stage 3 of the subcycled normal velocity
+         call mpas_timer_start("FB_LTS copy soln")
          
-         ! Fine adjacent to interface 1
-         do ie = 1, nEdgesInLTSRegion(1,3)
-            iEdge = edgesInLTSRegion(1,3,ie)
-            normalVelocityCur(:,iEdge) = normalVelocityNew(:,iEdge)
-         end do
-         ! Fine in the interior, away from interface 1
-         do ie = 1, nEdgesInLTSRegion(1,1)
-            iEdge = edgesInLTSRegion(1,1,ie)
-            normalVelocityCur(:,iEdge) = normalVelocityNew(:,iEdge)
-         end do
-
          ! Fine adjacent to interface 1
          do ic = 1, nCellsInLTSRegion(1,3)
             iCell = cellsInLTSRegion(1,3,ic)
@@ -1223,9 +1216,28 @@ module ocn_time_integration_fblts
             layerThicknessCur(:,iCell) = layerThicknessNew(:,iCell)
          end do
 
-         call mpas_timer_stop("FB_LTS copy new soln into cur soln")
+         call mpas_timer_stop("FB_LTS copy soln")
 
+      end do  ! end of fine time-step subcycling loop
+      
+      
+      ! Copy data from normalVelocityCur into normalVelocityNew
+      ! which currently holds the New data. 
+      call mpas_timer_start("FB_LTS copy soln")
+
+      ! Fine adjacent to interface 1
+      do ie = 1, nEdgesInLTSRegion(1,3)
+         iEdge = edgesInLTSRegion(1,3,ie)
+         normalVelocityNew(:,iEdge) = normalVelocityCur(:,iEdge)
       end do
+      ! Fine in the interior, away from interface 1
+      do ie = 1, nEdgesInLTSRegion(1,1)
+         iEdge = edgesInLTSRegion(1,1,ie)
+         normalVelocityNew(:,iEdge) = normalVelocityCur(:,iEdge)
+      end do
+      
+      call mpas_timer_stop("FB_LTS copy soln")
+
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! END FINE ADVANCEMENT
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
