@@ -74,7 +74,7 @@ module ocn_time_integration
        timeIntRK4              = 4, &! 4th-order Runge-Kutta
        timeIntLTS              = 5, &! local time-stepping
        timeIntFBLTS            = 6, &! forward-backward lts
-       timeIntSplitExplicitAB2 = 7, &! split-explicit AB2 baroclinic
+       timeIntSplitExplicitAB2 = 7   ! split-explicit AB2 baroclinic
 
 !***********************************************************************
 
